@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/infrastructure/db";
-import { dbToPct } from "@/infrastructure/money";
+import { dbToPaise, dbToPct, paiseToDb } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
 import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
@@ -54,13 +54,32 @@ export async function addLine(
 
     // Price is resolved server-side from the customer's tier list and snapshotted onto
     // the line, so a later price-list edit cannot rewrite an existing quotation.
-    const [tierItem, maxSequence] = await Promise.all([
+    const [tierItem, maxSequence, variant] = await Promise.all([
       tx.priceListItem.findFirst({
         where: { productId: product.id, priceList: { tier: quotation.customer.tier } },
       }),
       tx.quotationLine.aggregate({ where: { quotationId }, _max: { sequence: true } }),
+      // Scoped to this product on purpose. A variant id is client-supplied, and looking it
+      // up by id alone would let a caller attach another product's variant — and its extra
+      // price — to this line. Constraining the lookup makes that unrepresentable rather
+      // than relying on a check someone can forget.
+      input.variantId
+        ? tx.productVariant.findFirst({ where: { id: input.variantId, productId: input.productId } })
+        : Promise.resolve(null),
     ]);
-    const unitPrice = tierItem?.price ?? product.listPrice;
+
+    if (input.variantId && !variant) {
+      throw new DomainError("That variant does not belong to this product.");
+    }
+
+    // The variant's extra price is part of what the customer pays, so it must be folded
+    // into the snapshotted unit price rather than applied later at render time. Added in
+    // integer paise through the money boundary: the two operands are DECIMAL columns and
+    // adding them as floats is exactly the drift this codebase refuses to accept.
+    const basePrice = tierItem?.price ?? product.listPrice;
+    const unitPrice = variant
+      ? paiseToDb(dbToPaise(basePrice) + dbToPaise(variant.extraPrice))
+      : basePrice;
 
     await tx.quotationLine.create({
       data: {
@@ -85,8 +104,13 @@ export async function addLine(
       entityId: quotationId,
       action: input.fromUpsell ? "UPSELL_ACCEPTED" : "LINE_ADDED",
       actorId,
-      reason: `${product.name} x${input.quantity} at ${input.discountPct}% discount`,
-      payload: { productId: product.id, quantity: input.quantity, discountPct: input.discountPct },
+      reason: `${variant ? `${product.name} (${variant.attribute}: ${variant.value})` : product.name} x${input.quantity} at ${input.discountPct}% discount`,
+      payload: {
+        productId: product.id,
+        variantId: variant?.id ?? null,
+        quantity: input.quantity,
+        discountPct: input.discountPct,
+      },
     });
 
     return rescoreAfterEdit(tx, quotationId, dbToPct(before.riskScore), actorId);

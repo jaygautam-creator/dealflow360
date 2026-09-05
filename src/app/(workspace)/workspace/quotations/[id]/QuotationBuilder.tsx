@@ -13,7 +13,7 @@ import { RiskPanel } from "./RiskPanel";
 import type { RiskAssessment } from "@/domain/risk/types";
 
 interface Line {
-  id: string; productId: string; productName: string; categoryName: string;
+  id: string; productId: string; productName: string; variantLabel: string | null; categoryName: string;
   categoryCeilingPct: number; quantity: number; unitPrice: number; discountPct: number;
   lineType: string; planName: string | null; fromUpsell: boolean; netTotal: number;
 }
@@ -21,9 +21,14 @@ interface Suggestion {
   ruleId: string; productId: string; productName: string; listPricePaise: number;
   productMarginPct: number; marginDeltaPct: number; isPromoted: boolean; reason: string;
 }
+interface VariantOption {
+  id: string; attribute: string; value: string; extraPrice: number;
+}
+
 interface ProductOption {
   id: string; name: string; sku: string; categoryName: string;
   categoryCeilingPct: number; price: number; kind: string;
+  variants: VariantOption[];
 }
 
 export function QuotationBuilder({
@@ -58,6 +63,15 @@ export function QuotationBuilder({
   // lives only in client state rather than as a database column or an API call.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [newProductId, setNewProductId] = useState(products[0]?.id ?? "");
+  const [newVariantId, setNewVariantId] = useState("");
+
+  const selectedProduct = products.find((p) => p.id === newProductId);
+  const selectedVariant = selectedProduct?.variants.find((v) => v.id === newVariantId);
+  // Shown before the line is added so the rep sees what the customer will pay, including
+  // the variant's extra price. The server recomputes this on add from the tier price list;
+  // this is a preview, not an input — a client-supplied price would make governance
+  // advisory rather than enforced.
+  const previewPrice = (selectedProduct?.price ?? 0) + (selectedVariant?.extraPrice ?? 0);
   const [newQty, setNewQty] = useState(1);
   const [newDiscount, setNewDiscount] = useState(0);
 
@@ -130,6 +144,7 @@ export function QuotationBuilder({
                             {line.lineType === "RECURRING" ? <Badge tone="neutral">{line.planName}</Badge> : null}
                           </div>
                           <div className="text-xs text-neutral-500">
+                            {line.variantLabel ? `${line.variantLabel} · ` : ""}
                             {line.categoryName} · ceiling {line.categoryCeilingPct}%
                           </div>
                         </td>
@@ -175,18 +190,41 @@ export function QuotationBuilder({
               {editable ? (
                 <div className="flex flex-wrap items-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
                   <Select label="Product" value={newProductId} disabled={working}
-                    onChange={(e) => setNewProductId(e.target.value)} containerClassName="min-w-[220px] flex-1">
+                    onChange={(e) => { setNewProductId(e.target.value); setNewVariantId(""); }}
+                    containerClassName="min-w-[220px] flex-1">
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>{p.name} — {money(p.price)} ({p.categoryName}, max {p.categoryCeilingPct}%)</option>
                     ))}
                   </Select>
+                  {/* Only rendered for products that actually have variants, so the common
+                      case stays a two-field form rather than carrying an empty control. */}
+                  {selectedProduct && selectedProduct.variants.length > 0 ? (
+                    <Select label={selectedProduct.variants[0].attribute} value={newVariantId} disabled={working}
+                      onChange={(e) => setNewVariantId(e.target.value)} containerClassName="min-w-[160px]">
+                      <option value="">Standard</option>
+                      {selectedProduct.variants.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.value}{v.extraPrice ? ` (+${money(v.extraPrice)})` : ""}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : null}
                   <Input label="Qty" type="number" min={1} value={newQty} disabled={working}
                     onChange={(e) => setNewQty(Number(e.target.value))} containerClassName="w-20" />
                   <Input label="Discount %" type="number" min={0} max={100} step={0.5} value={newDiscount} disabled={working}
                     onChange={(e) => setNewDiscount(Number(e.target.value))} containerClassName="w-28" />
                   <Button loading={working} onClick={() => void call(`/api/quotations/${quotation.id}/lines`, {
-                    method: "POST", body: JSON.stringify({ productId: newProductId, quantity: newQty, discountPct: newDiscount }),
+                    method: "POST",
+                    body: JSON.stringify({
+                      productId: newProductId,
+                      variantId: newVariantId || null,
+                      quantity: newQty,
+                      discountPct: newDiscount,
+                    }),
                   })}><Plus className="size-4" />Add</Button>
+                  <span className="pb-2 text-xs text-neutral-500">
+                    Unit {money(previewPrice)}
+                  </span>
                 </div>
               ) : null}
 

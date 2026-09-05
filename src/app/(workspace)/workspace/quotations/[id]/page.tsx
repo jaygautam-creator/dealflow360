@@ -44,6 +44,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       id: l.id,
       productId: l.productId,
       productName: l.product.name,
+      variantLabel: l.variant ? `${l.variant.attribute}: ${l.variant.value}` : null,
       categoryName: l.product.category.name,
       categoryCeilingPct: dbToPct(l.product.category.maxDiscountPct),
       quantity: l.quantity,
@@ -119,6 +120,15 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
         categoryCeilingPct: dbToPct(p.category.maxDiscountPct),
         price: Number(p.effectivePrice),
         kind: p.kind,
+        // Sent to the client so the picker can show the price the customer will actually
+        // pay before the line is added. The server still resolves the real price on add —
+        // this list is for display, never the source of truth.
+        variants: p.variants.map((v) => ({
+          id: v.id,
+          attribute: v.attribute,
+          value: v.value,
+          extraPrice: Number(v.extraPrice),
+        })),
       }))}
       audit={audit.map((a) => ({
         id: a.id,
