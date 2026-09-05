@@ -1,3 +1,4 @@
+import { dbToPct } from "@/infrastructure/money";
 import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createCategory, deleteCategory, updateCategory } from "./actions";
@@ -10,7 +11,7 @@ export default async function CategoriesPage() {
   const rows = categories.map((c) => ({
     id: c.id,
     name: c.name,
-    maxDiscountPct: c.maxDiscountPct.toString(),
+    maxDiscountPct: String(dbToPct(c.maxDiscountPct)),
   }));
 
   return (
@@ -21,11 +22,7 @@ export default async function CategoriesPage() {
       rows={rows}
       columns={[
         { key: "name", header: "Name" },
-        {
-          key: "maxDiscountPct",
-          header: "Max discount",
-          render: (row) => `${row.maxDiscountPct}%`,
-        },
+        { key: "maxDiscountPct", header: "Max discount", kind: "percent" },
       ]}
       fields={[
         { name: "name", label: "Name", type: "text", required: true },
@@ -38,7 +35,6 @@ export default async function CategoriesPage() {
           hint: "Whole percentage, e.g. 15 for 15%",
         },
       ]}
-      toFormValues={(row) => ({ name: row.name, maxDiscountPct: row.maxDiscountPct })}
       createAction={createCategory}
       updateAction={updateCategory}
       deleteAction={deleteCategory}

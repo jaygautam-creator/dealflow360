@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { ReactNode } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Boxes, Pencil, Plus, Trash2 } from "lucide-react";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -33,27 +34,47 @@ export type FieldDef =
   | { name: string; label: string; type: "checkbox" }
   | { name: string; label: string; type: "textarea" };
 
-export interface ColumnDef<Row> {
-  key: string;
-  header: string;
-  render?: (row: Row) => ReactNode;
-}
+// Columns are pure data, never callbacks — the whole point is that this config is built
+// inside a Server Component page and handed to this Client Component as a prop. React
+// Server Components can only serialise plain data across that boundary, so a `render`
+// function here would crash the build the moment a page tried to pass one (it did once —
+// see git history). "kind" lets pages get badges/percent suffixes without a closure.
+export type ColumnDef =
+  | { key: string; header: string; kind?: "text" }
+  | { key: string; header: string; kind: "percent" }
+  | { key: string; header: string; kind: "badge"; toneMap: Record<string, BadgeTone>; labelMap?: Record<string, string> };
 
 export type ActionResult = { error?: string } | void;
 
-export interface EntityManagerProps<Row extends { id: string }> {
+export interface DetailLink {
+  hrefBase: string;
+  label: string;
+}
+
+export interface EntityManagerProps<Row extends Record<string, unknown> & { id: string }> {
   title: string;
   subtitle?: string;
-  columns: ColumnDef<Row>[];
+  columns: ColumnDef[];
   rows: Row[];
   fields: FieldDef[];
   emptyLabel: string;
   createAction: (formData: FormData) => Promise<ActionResult>;
   updateAction: (id: string, formData: FormData) => Promise<ActionResult>;
   deleteAction: (id: string) => Promise<ActionResult>;
-  /** Populate the edit modal's default values from a row. */
-  toFormValues: (row: Row) => Record<string, string | boolean>;
-  extraRowActions?: (row: Row) => ReactNode;
+  /** When set, an extra row action links to a nested detail screen (e.g. stock levels). */
+  detailLink?: DetailLink;
+}
+
+function renderCell(row: Record<string, unknown>, col: ColumnDef) {
+  const value = row[col.key];
+  if (col.kind === "percent") return `${String(value ?? "")}%`;
+  if (col.kind === "badge") {
+    const key = String(value);
+    const tone = col.toneMap[key] ?? "neutral";
+    const label = col.labelMap?.[key] ?? key;
+    return <Badge tone={tone}>{label}</Badge>;
+  }
+  return String(value ?? "");
 }
 
 function FieldInput({
@@ -71,9 +92,11 @@ function FieldInput({
         required={field.required}
         defaultValue={typeof defaultValue === "string" ? defaultValue : ""}
       >
-        <option value="" disabled>
-          Select…
-        </option>
+        {field.required && (
+          <option value="" disabled>
+            Select…
+          </option>
+        )}
         {field.options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
@@ -118,7 +141,7 @@ function FieldInput({
   );
 }
 
-export function EntityManager<Row extends { id: string }>({
+export function EntityManager<Row extends Record<string, unknown> & { id: string }>({
   title,
   subtitle,
   columns,
@@ -128,15 +151,22 @@ export function EntityManager<Row extends { id: string }>({
   createAction,
   updateAction,
   deleteAction,
-  toFormValues,
-  extraRowActions,
+  detailLink,
 }: EntityManagerProps<Row>) {
   const [modalRow, setModalRow] = useState<Row | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const editing = modalRow !== null && modalRow !== "new" ? modalRow : null;
-  const defaults = editing ? toFormValues(editing) : {};
+  // Defaults are read straight off the row by field name — rows are shaped by the page to
+  // match field names 1:1, so no per-entity mapping function is needed (see ColumnDef note).
+  const defaults: Record<string, string | boolean> = {};
+  if (editing) {
+    for (const field of fields) {
+      const value = editing[field.name];
+      defaults[field.name] = field.type === "checkbox" ? Boolean(value) : String(value ?? "");
+    }
+  }
 
   function closeModal() {
     setModalRow(null);
@@ -193,13 +223,17 @@ export function EntityManager<Row extends { id: string }>({
               {rows.map((row) => (
                 <TR key={row.id}>
                   {columns.map((col) => (
-                    <TD key={col.key}>
-                      {col.render ? col.render(row) : String((row as never)[col.key] ?? "")}
-                    </TD>
+                    <TD key={col.key}>{renderCell(row, col)}</TD>
                   ))}
                   <TD className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {extraRowActions?.(row)}
+                      {detailLink && (
+                        <Link href={`${detailLink.hrefBase}/${row.id}`}>
+                          <Button variant="ghost" size="sm" aria-label={detailLink.label}>
+                            <Boxes className="size-4" />
+                          </Button>
+                        </Link>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

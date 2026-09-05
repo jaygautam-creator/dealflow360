@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/Badge";
 import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createApprovalRule, deleteApprovalRule, updateApprovalRule } from "./actions";
@@ -9,11 +8,12 @@ export default async function ApprovalRulesPage() {
   const rows = rules.map((r) => ({
     id: r.id,
     name: r.name,
+    sequence: String(r.sequence),
     minScore: r.minScore.toString(),
     maxScore: r.maxScore?.toString() ?? "",
+    range: `${r.minScore.toString()} – ${r.maxScore?.toString() ?? "∞"}`,
     requiresManager: r.requiresManager,
     requiresFinance: r.requiresFinance,
-    sequence: String(r.sequence),
   }));
 
   return (
@@ -25,23 +25,20 @@ export default async function ApprovalRulesPage() {
       columns={[
         { key: "sequence", header: "Order" },
         { key: "name", header: "Name" },
+        { key: "range", header: "Score range" },
         {
-          key: "range",
-          header: "Score range",
-          render: (row) => `${row.minScore} – ${row.maxScore || "∞"}`,
+          key: "requiresManager",
+          header: "Manager",
+          kind: "badge",
+          toneMap: { true: "info", false: "neutral" },
+          labelMap: { true: "Required", false: "—" },
         },
         {
-          key: "requires",
-          header: "Requires",
-          render: (row) => (
-            <div className="flex gap-1">
-              {row.requiresManager && <Badge tone="info">Manager</Badge>}
-              {row.requiresFinance && <Badge tone="warning">Finance</Badge>}
-              {!row.requiresManager && !row.requiresFinance && (
-                <Badge tone="neutral">Auto-approve</Badge>
-              )}
-            </div>
-          ),
+          key: "requiresFinance",
+          header: "Finance",
+          kind: "badge",
+          toneMap: { true: "warning", false: "neutral" },
+          labelMap: { true: "Required", false: "—" },
         },
       ]}
       fields={[
@@ -63,14 +60,6 @@ export default async function ApprovalRulesPage() {
         { name: "requiresManager", label: "Requires sales manager approval", type: "checkbox" },
         { name: "requiresFinance", label: "Requires finance approval", type: "checkbox" },
       ]}
-      toFormValues={(row) => ({
-        name: row.name,
-        sequence: row.sequence,
-        minScore: row.minScore,
-        maxScore: row.maxScore,
-        requiresManager: row.requiresManager,
-        requiresFinance: row.requiresFinance,
-      })}
       createAction={createApprovalRule}
       updateAction={updateApprovalRule}
       deleteAction={deleteApprovalRule}

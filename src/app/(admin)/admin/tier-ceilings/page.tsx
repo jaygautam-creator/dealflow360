@@ -1,4 +1,5 @@
 import { CustomerTier } from "@/generated/prisma";
+import { dbToPct } from "@/infrastructure/money";
 import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createTierCeiling, deleteTierCeiling, updateTierCeiling } from "./actions";
@@ -9,7 +10,7 @@ export default async function TierCeilingsPage() {
   const rows = ceilings.map((c) => ({
     id: c.id,
     tier: c.tier,
-    maxDiscountPct: c.maxDiscountPct.toString(),
+    maxDiscountPct: String(dbToPct(c.maxDiscountPct)),
   }));
 
   const configuredTiers = new Set(rows.map((r) => r.tier));
@@ -26,11 +27,7 @@ export default async function TierCeilingsPage() {
       rows={rows}
       columns={[
         { key: "tier", header: "Tier" },
-        {
-          key: "maxDiscountPct",
-          header: "Max discount",
-          render: (row) => `${row.maxDiscountPct}%`,
-        },
+        { key: "maxDiscountPct", header: "Max discount", kind: "percent" },
       ]}
       fields={[
         { name: "tier", label: "Tier", type: "select", options: tierOptions, required: true },
@@ -42,7 +39,6 @@ export default async function TierCeilingsPage() {
           required: true,
         },
       ]}
-      toFormValues={(row) => ({ tier: row.tier, maxDiscountPct: row.maxDiscountPct })}
       createAction={createTierCeiling}
       updateAction={updateTierCeiling}
       deleteAction={deleteTierCeiling}
