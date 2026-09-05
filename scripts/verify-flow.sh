@@ -11,6 +11,26 @@
 set -uo pipefail
 
 BASE="${BASE_URL:-http://localhost:3000}"
+
+# ── Mutual exclusion ────────────────────────────────────────────────────────
+# These scripts reseed the database, which swaps every id underneath anything else
+# running against it. Two people verifying at once therefore produce confusing,
+# meaningless failures rather than useful ones. mkdir is atomic on every POSIX
+# filesystem, which makes it a correct lock primitive without needing flock (absent
+# on macOS by default).
+LOCKDIR="${TMPDIR:-/tmp}/dealflow-verify.lock"
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  echo
+  echo "  Another verification run is already in progress."
+  echo "  (holder: $(cat "$LOCKDIR/owner" 2>/dev/null || echo unknown))"
+  echo "  Wait for it to finish, or remove $LOCKDIR if it was left behind by a crash."
+  echo
+  exit 2
+fi
+echo "pid $$ started $(date '+%H:%M:%S')" > "$LOCKDIR/owner"
+cleanup() { rm -rf "$LOCKDIR"; }
+trap cleanup EXIT INT TERM
+
 JAR=$(mktemp -d)
 PASS=0; FAIL=0
 
@@ -121,7 +141,29 @@ R=$(post rep "/api/quotations/$QID/confirm")
 check "$(jq -r .error <<<"$R" | grep -c 'already been confirmed')" "1" "Double confirmation is refused"
 
 echo
-b "12. Customer portal — a clean quote goes out and comes back changed"
+b "12. Payment — an invoice is settled by what was received, not by assertion"
+INV=$(npx --yes tsx scripts/_ids.ts "$QID" 2>/dev/null | tail -1)
+INVID=$(jq -r .invoiceId <<<"$INV"); AMT=$(jq -r .invoiceAmount <<<"$INV")
+dim "invoice total $AMT"
+
+R=$(post rep "/api/invoices/$INVID/payments" "{\"amount\":100}")
+check "$(jq -r .error <<<"$R" | grep -c 'Only finance')" "1" "A sales rep cannot record a payment"
+
+HALF=$(awk "BEGIN{printf \"%.2f\", $AMT/2}")
+R=$(post fin "/api/invoices/$INVID/payments" "{\"amount\":$HALF,\"method\":\"BANK\"}")
+check "$(jq -r .status <<<"$R")" "OPEN" "A part payment leaves the invoice open"
+
+R=$(post fin "/api/invoices/$INVID/payments" "{\"amount\":$AMT}")
+check "$(jq -r .error <<<"$R" | grep -c 'overpay')" "1" "Overpayment is refused"
+
+R=$(post fin "/api/invoices/$INVID/payments" "{\"amount\":$HALF}")
+check "$(jq -r .status <<<"$R")" "PAID" "Paying the remainder settles the invoice"
+
+R=$(post fin "/api/invoices/$INVID/payments" '{"amount":1}')
+check "$(jq -r .error <<<"$R" | grep -c 'already settled')" "1" "A settled invoice takes no further payment"
+
+echo
+b "13. Customer portal — a clean quote goes out and comes back changed"
 QID2=$(post rep /api/quotations "{\"customerId\":\"$ACME\"}" | jq -r .id)
 R=$(post rep "/api/quotations/$QID2/lines" "{\"productId\":\"$LAPTOP\",\"quantity\":10,\"discountPct\":5}")
 check "$(jq -r .recalc.riskScore <<<"$R")" "0" "A 5% discount on a Gold customer needs no approval"
@@ -135,7 +177,7 @@ PORTAL=$(get buyer /portal)
 check "$(grep -c 'Awaiting your review' <<<"$PORTAL")" "1" "The customer sees it waiting for review"
 
 echo
-b "13. The portal must not leak internal figures"
+b "14. The portal must not leak internal figures"
 PQ=$(get buyer "/portal/quotations/$QID2")
 check "$(seen "$PQ" 'Discount risk')" "no" "Risk scoring is invisible to the customer"
 check "$(seen "$PQ" 'drove the score')" "no" "The decision trace is invisible to the customer"
@@ -143,7 +185,7 @@ check "$(seen "$PQ" 'Margin')" "no" "Margin is never sent to the customer"
 check "$(seen "$PQ" 'Audit trail')" "no" "The internal audit trail is invisible to the customer"
 
 echo
-b "14. Customer counters above the ceiling; the rep accepts"
+b "15. Customer counters above the ceiling; the rep accepts"
 R=$(post buyer "/api/portal/quotations/$QID2/messages" \
   '{"body":"We need a better price to proceed this quarter.","requestedDiscountPct":20}')
 check "$(jq -r .status <<<"$R")" "UNDER_NEGOTIATION" "The counter-offer moves the deal into negotiation"
@@ -155,7 +197,7 @@ check "$(jq -r .riskScore <<<"$R")" "7.5" "20% against a 15% ceiling re-scores t
 check "$(jq -r .reapprovalRequired <<<"$R")" "true" "Accepting the counter forces the quote back into approval"
 
 echo
-b "15. The re-opened quotation cannot be confirmed until it is approved again"
+b "16. The re-opened quotation cannot be confirmed until it is approved again"
 R=$(post rep "/api/quotations/$QID2/confirm")
 check "$(jq -r .error <<<"$R" | grep -c 'cannot be confirmed')" "1" "Confirmation is blocked on the re-opened quotation"
 

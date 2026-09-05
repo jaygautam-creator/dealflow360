@@ -16,11 +16,23 @@ async function main() {
   const quotationId = process.argv[2];
 
   if (quotationId) {
-    const message = await prisma.negotiationMessage.findFirst({
-      where: { quotationId, status: "OPEN", requestedDiscountPct: { not: null } },
-      orderBy: { createdAt: "desc" },
-    });
-    console.log(JSON.stringify({ messageId: message?.id ?? null }));
+    const [message, invoice] = await Promise.all([
+      prisma.negotiationMessage.findFirst({
+        where: { quotationId, status: "OPEN", requestedDiscountPct: { not: null } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.invoice.findFirst({
+        where: { salesOrder: { quotationId }, type: "ONE_TIME" },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+    console.log(
+      JSON.stringify({
+        messageId: message?.id ?? null,
+        invoiceId: invoice?.id ?? null,
+        invoiceAmount: invoice ? Number(invoice.amount) : null,
+      }),
+    );
   } else {
     console.log(
       JSON.stringify({

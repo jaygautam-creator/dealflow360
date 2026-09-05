@@ -10,6 +10,26 @@
 set -uo pipefail
 
 BASE="${BASE_URL:-http://localhost:3000}"
+
+# ── Mutual exclusion ────────────────────────────────────────────────────────
+# These scripts reseed the database, which swaps every id underneath anything else
+# running against it. Two people verifying at once therefore produce confusing,
+# meaningless failures rather than useful ones. mkdir is atomic on every POSIX
+# filesystem, which makes it a correct lock primitive without needing flock (absent
+# on macOS by default).
+LOCKDIR="${TMPDIR:-/tmp}/dealflow-verify.lock"
+if ! mkdir "$LOCKDIR" 2>/dev/null; then
+  echo
+  echo "  Another verification run is already in progress."
+  echo "  (holder: $(cat "$LOCKDIR/owner" 2>/dev/null || echo unknown))"
+  echo "  Wait for it to finish, or remove $LOCKDIR if it was left behind by a crash."
+  echo
+  exit 2
+fi
+echo "pid $$ started $(date '+%H:%M:%S')" > "$LOCKDIR/owner"
+cleanup() { rm -rf "$LOCKDIR"; }
+trap cleanup EXIT INT TERM
+
 JAR=$(mktemp -d)
 PASS=0
 FAIL=0
