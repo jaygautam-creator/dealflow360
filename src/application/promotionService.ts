@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/infrastructure/db";
+import { scopedQuotationWhere } from "@/application/queries";
+import type { SessionUser } from "@/infrastructure/auth/session";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
 import {
   DEFAULT_MONTH_END_POLICY,
@@ -23,17 +25,29 @@ import {
  * product — never an arbitrary item out of the catalogue.
  */
 export async function monthEndOfferFor(
+  user: SessionUser,
   quotationId: string,
   today: Date = new Date(),
 ): Promise<MonthEndOffer> {
-  const quotation = await prisma.quotation.findUniqueOrThrow({
-    where: { id: quotationId },
+  // Scoped for the same reason suggestionsFor is: the offer names products, discounts and
+  // order value, all of which belong to one tenant. Relying on the caller having checked
+  // first is the failure mode the scope filter exists to make impossible.
+  const quotation = await prisma.quotation.findFirst({
+    where: { AND: [{ id: quotationId }, scopedQuotationWhere(user)] },
     include: {
       lines: {
         include: { product: { include: { category: true } }, variant: true },
       },
     },
   });
+
+  if (!quotation) {
+    return {
+      eligible: false,
+      daysToMonthEnd: 0,
+      reason: "That quotation is not available.",
+    };
+  }
 
   const lines: MonthEndLineInput[] = quotation.lines.map((line) => {
     // Variant surcharges are part of what the customer pays, so they are part of what a

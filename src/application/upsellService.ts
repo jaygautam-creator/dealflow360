@@ -1,5 +1,7 @@
 import "server-only";
 import { prisma } from "@/infrastructure/db";
+import { scopedQuotationWhere } from "@/application/queries";
+import type { SessionUser } from "@/infrastructure/auth/session";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
 import { rankSuggestions, netLineTotal, type UpsellCandidate } from "@/domain/upsell/recommend";
 
@@ -11,13 +13,18 @@ import { rankSuggestions, netLineTotal, type UpsellCandidate } from "@/domain/up
  * the quotation's *current* revenue and cost, so the number the rep sees is the real
  * consequence of adding that line to this specific deal — not a generic product statistic.
  */
-export async function suggestionsFor(quotationId: string) {
-  const quotation = await prisma.quotation.findUniqueOrThrow({
-    where: { id: quotationId },
+export async function suggestionsFor(user: SessionUser, quotationId: string) {
+  // Scoped, not trusted. This used to take an id alone and findUniqueOrThrow it, which
+  // made it correct only because its single caller happened to have already scoped the
+  // read. That is precisely the arrangement scopedQuotationWhere exists to remove: a
+  // filter cannot be forgotten at a call site, a convention can. Suggestions expose
+  // product costs and margins, so a foreign id must return nothing rather than a list.
+  const quotation = await prisma.quotation.findFirst({
+    where: { AND: [{ id: quotationId }, scopedQuotationWhere(user)] },
     include: { lines: { include: { product: true, variant: true } } },
   });
 
-  if (quotation.lines.length === 0) return [];
+  if (!quotation || quotation.lines.length === 0) return [];
 
   const cartProductIds = quotation.lines.map((l) => l.productId);
 

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const input = AddLineSchema.parse(await request.json());
 
     const result = await addLine(id, input, user);
-    return NextResponse.json({ ...result, suggestions: await suggestionsFor(id) });
+    return NextResponse.json({ ...result, suggestions: await suggestionsFor(user, id) });
   } catch (error) {
     return apiError(error);
   }
@@ -39,7 +39,7 @@ export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: st
       select: { ownerId: true },
     });
     assertCanMutateQuotation(user, quotation);
-    return NextResponse.json({ suggestions: await suggestionsFor(id) });
+    return NextResponse.json({ suggestions: await suggestionsFor(user, id) });
   } catch (error) {
     return apiError(error);
   }

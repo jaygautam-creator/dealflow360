@@ -22,9 +22,9 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   const [catalogue, suggestions, audit, monthEndOffer] = await Promise.all([
     catalogueForCustomer(quotation.customerId),
-    suggestionsFor(quotation.id),
+    suggestionsFor(user, quotation.id),
     auditTrail("Quotation", quotation.id),
-    monthEndOfferFor(quotation.id),
+    monthEndOfferFor(user, quotation.id),
   ]);
 
   // Prisma Decimals cannot cross the server/client boundary, so the view model is built

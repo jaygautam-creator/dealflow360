@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ lineI
       where: { id: lineId },
       select: { quotationId: true },
     });
-    return NextResponse.json({ ...result, suggestions: await suggestionsFor(line.quotationId) });
+    return NextResponse.json({ ...result, suggestions: await suggestionsFor(user, line.quotationId) });
   } catch (error) {
     return apiError(error);
   }
@@ -43,7 +43,7 @@ export async function DELETE(_request: NextRequest, ctx: { params: Promise<{ lin
       select: { quotationId: true },
     });
     const result = await removeLine(lineId, user);
-    return NextResponse.json({ ...result, suggestions: await suggestionsFor(line.quotationId) });
+    return NextResponse.json({ ...result, suggestions: await suggestionsFor(user, line.quotationId) });
   } catch (error) {
     return apiError(error);
   }
