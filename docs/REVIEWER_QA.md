@@ -55,7 +55,7 @@ Point at the folders, then the constraint:
 
 **Why that matters** — this is the answer that lands:
 
-> Because it makes the rules testable in isolation. 183 tests, ~0.5 seconds, no database and
+> Because it makes the rules testable in isolation. 185 tests, ~0.5 seconds, no database and
 > no mocks. And it's the honest answer to "did you actually implement this, or fake it for
 > the demo" — the rules are isolated enough to be tested directly, and they are.
 
@@ -174,7 +174,7 @@ For each: the simple sentence first, then the depth if they push.
 
 This is the question the spec practically promises they'll ask. Three answers, escalating:
 
-1. **Run the tests.** `npm test` — 183 tests in about half a second. Open
+1. **Run the tests.** `npm test` — 185 tests in about half a second. Open
    `src/domain/risk/blendedRisk.test.ts`; the worked example from their own problem
    statement is in there as a test case.
 2. **Change a rule live.** Open the admin screen, change the aggregate amplifier or an
@@ -387,5 +387,5 @@ The confirmation API handler at `src/app/api/quotations/[id]/confirm/route.ts:7-
 
 They are completely real and strictly isolated:
 1. `src/domain` contains zero dependencies on Prisma, Next.js, React, or external packages (verify with `grep -rn "from " src/domain/`). Every rule is a pure function.
-2. Because the domain layer has no I/O, database, or clock dependencies, `npm test` executes the complete suite of 183 unit tests with zero mocks in approximately 0.45s.
+2. Because the domain layer has no I/O, database, or clock dependencies, `npm test` executes the complete suite of 185 unit tests with zero mocks in approximately 0.45s.
 3. For live verification, `scripts/verify-flow.sh` walks the problem statement's Section 9 end-to-end lifecycle flow against the live Next.js HTTP server (`http://localhost:3000`), testing real database transactions, multi-warehouse stock allocations, and approval chains.

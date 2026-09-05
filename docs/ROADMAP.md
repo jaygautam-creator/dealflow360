@@ -95,7 +95,7 @@ was not a gap.
 
 ## 7. Tests above the domain layer
 
-**Today:** 125 unit tests cover the business rules, and 57 live assertions cover access
+**Today:** 185 unit tests cover the business rules, and 62 live assertions cover access
 control and the full lifecycle end to end. The React components have no tests.
 
 **Next:** component tests for the quotation builder — particularly that the risk panel

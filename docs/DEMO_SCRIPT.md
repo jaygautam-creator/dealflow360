@@ -143,7 +143,7 @@ This is where the demo becomes a conversation. Pick whichever lands.
 Open a terminal.
 
 ```bash
-npm test        # 183 unit tests, about half a second
+npm test        # 185 unit tests, about half a second
 npm run verify  # 62 assertions against the running server (29 access + 33 lifecycle)
 ```
 

@@ -26,7 +26,7 @@ npm run dev                           # http://localhost:3000
 ```
 
 ```bash
-npm test              # 183 unit tests, ~0.5s
+npm test              # 185 unit tests, ~0.5s
 npm run verify        # 62 live assertions against the running server
 npx tsc --noEmit      # typecheck
 npm run build         # NEVER while `npm run dev` is running — it rewrites .next underneath it
@@ -70,7 +70,7 @@ src/components/      UI            Presentational component library.
 src/proxy.ts         Pipeline      Path-to-permission enforcement before a route renders.
 ```
 
-`src/domain` importing nothing is what makes 183 tests run in half a second with no database
+`src/domain` importing nothing is what makes 185 tests run in half a second with no database
 and no mocks — and it is the honest answer to "did you really implement these rules?"
 
 **Non-negotiable conventions:**
@@ -90,17 +90,17 @@ and no mocks — and it is the honest answer to "did you really implement these 
 
 | Gate | Result |
 |---|---|
-| Unit tests | 183 |
+| Unit tests | 185 |
 | Live access assertions | 29 |
 | Live lifecycle assertions | 33 |
 | Production build | clean |
 
 **Built:** six domain engines (blended risk scoring, approval routing, greedy set-cover
 warehouse split, hybrid billing + proration, per-rep z-score anomaly detection, upsell
-ranking) · counter-offer cap · month-end promotion engine · /403 page · bulk data generator ·
+ranking) · counter-offer cap · month-end promotion engine, tunable from /admin/month-end-offers by an administrator or a sales manager · /403 page · bulk data generator ·
 admin audit trail on all config screens · full schema + seed · auth, RBAC matrix,
 request-pipeline path guards · quotation / approval / confirmation / portal / payment / health services ·
-the whole admin config area (9 screens) · pipeline board, quotations table, quotation builder
+the whole admin config area (10 screens) · pipeline board, quotations table, quotation builder
 with live risk trace, approval queue, deal-health dashboard, orders / invoices / subscriptions lists ·
 customer portal with negotiation · reports with filters and CSV/XLS export · manual
 fulfilment override and backorder consolidation · subscription modify / cancel with
@@ -129,8 +129,27 @@ All items previously on this list — product variants in the quotation builder,
 
 ## Known Limitations
 
-- **Month-end window and bonus are domain constants:** In `src/domain/promotion/monthEnd.ts`, the month-end promotion window (7 days) and bonus discount (3%) are domain constants (`DEFAULT_MONTH_END_POLICY`) rather than configurable database table rows.
-- **Bulk generator quotation boundaries:** The bulk generator (`prisma/seed-bulk.ts`) creates `CONFIRMED` quotations without downstream `SalesOrder` records because orders are produced by the atomic confirmation transaction (`confirmationService.ts`), and fabricating orders directly in seed data would misrepresent what the system actually executed.
+- **`Customer.email` is not `@unique`.** Customers are admin-created, never self-registered,
+  so duplicates are not a live risk. It should be unique; it is a one-line migration on a
+  populated table, and that class of migration can fail mid-apply on existing duplicate
+  data — which is why it was not run hours before judging, while the additive
+  `MonthEndPromotion` table was.
+- **`PROMOTION_BOOST = 1.25` is a constant** in `src/domain/upsell/recommend.ts`, while
+  every other tunable lives in a table. It is the one remaining exception to that rule.
+- **Accepting a counter-offer returns the quotation to `DRAFT`** rather than auto-routing
+  it to the next approval stage. This is deliberate: it strips approvals that no longer
+  cover the deal and hands it back to the rep with the new score and the reason shown.
+  Silently escalating to Finance without the rep seeing it is governance you cannot see.
+  The quote cannot be confirmed until re-approved — `verify-flow` section 16 asserts it.
+- **Five seeded `CONFIRMED` quotations have no `SalesOrder`.** They come from
+  `prisma/seed.ts` and represent deal history, not deals this system executed. Only
+  quotations confirmed through the running application carry the full order, invoice,
+  fulfilment and billing chain, because that chain is created by the confirmation
+  transaction in `confirmationService.ts`. The bulk generator deliberately produces no
+  `CONFIRMED` rows for the same reason.
+- **Schema hygiene deferred:** `ApprovalRule.sequence` is not `@unique` and `SalesOrder` /
+  `Invoice` lack some indexes. Both are migrations against populated tables; neither
+  affects correctness at demo scale.
 
 ---
 
