@@ -44,6 +44,12 @@ body {
   line-height: 1.5;
 }
 
+/* The application ground. Named rather than a raw neutral so the shell, the page
+   background and the html element can never drift apart. */
+.bg-canvas {
+  background-color: var(--color-canvas);
+}
+
 /* Figures line up in columns. Without this, a table of totals looks ragged and is
    noticeably harder to scan for the outlier — which is the whole point of the dashboard. */
 .tabular-nums {

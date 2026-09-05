@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Menu, X } from "lucide-react";
@@ -27,6 +30,7 @@ export interface AppShellProps {
 
 export function AppShell({ navItems, currentUser, children, brand }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const pathname = usePathname();
 
   const sidebarContent = (
     <nav aria-label="Primary" className="flex h-full flex-col">
@@ -34,24 +38,39 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
         {brand ?? "DealFlow360"}
       </div>
       <ul className="flex-1 space-y-1 px-3">
-        {navItems.map((item) => (
+        {navItems.map((item) => {
+          // Longest-prefix match, so /workspace/quotations/abc highlights "Quotations"
+          // while the "/workspace" root item does not also light up on every page.
+          const isActive =
+            item.active ??
+            (pathname === item.href ||
+              (item.href !== "/" &&
+                pathname.startsWith(`${item.href}/`) &&
+                !navItems.some(
+                  (other) =>
+                    other.href.length > item.href.length &&
+                    (pathname === other.href || pathname.startsWith(`${other.href}/`)),
+                )));
+
+          return (
           <li key={item.href}>
-            <a
+            <Link
               href={item.href}
-              aria-current={item.active ? "page" : undefined}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                item.active
-                  ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400"
-                  : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+                isActive
+                  ? "bg-indigo-50 text-indigo-700"
+                  : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
               )}
               onClick={() => setDrawerOpen(false)}
             >
               {item.icon}
               {item.label}
-            </a>
+            </Link>
           </li>
-        ))}
+          );
+        })}
       </ul>
       {currentUser && (
         <div className="flex items-center gap-3 border-t border-neutral-200 px-4 py-4 dark:border-neutral-800">
@@ -74,7 +93,7 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
   );
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex min-h-screen bg-canvas">
       <aside className="hidden w-64 shrink-0 border-r border-neutral-200 bg-white md:block dark:border-neutral-800 dark:bg-neutral-900">
         {sidebarContent}
       </aside>
