@@ -1,8 +1,9 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
 import type { Role } from "@/generated/prisma";
+import { SESSION_COOKIE, verifySessionToken } from "./token";
 
 /**
  * Session handling.
@@ -17,7 +18,7 @@ import type { Role } from "@/generated/prisma";
  * tampered or stale token cannot grant capability it did not have.
  */
 
-const COOKIE_NAME = "dealflow_session";
+const COOKIE_NAME = SESSION_COOKIE;
 const MAX_AGE_SECONDS = 60 * 60 * 12; // one working day
 
 export interface SessionUser {
@@ -72,23 +73,7 @@ export async function createSession(user: SessionUser): Promise<void> {
 /** Returns the current principal, or null. Never throws on a bad or expired token. */
 export async function getSession(): Promise<SessionUser | null> {
   const store = await cookies();
-  const token = store.get(COOKIE_NAME)?.value;
-  if (!token) return null;
-
-  try {
-    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
-    if (!payload.sub) return null;
-    return {
-      id: payload.sub,
-      email: String(payload.email),
-      name: String(payload.name),
-      role: payload.role as Role,
-      customerId: (payload.customerId as string | null) ?? null,
-    };
-  } catch {
-    // Expired, tampered with, or signed by a rotated secret — all mean "not logged in".
-    return null;
-  }
+  return verifySessionToken(store.get(COOKIE_NAME)?.value);
 }
 
 export async function destroySession(): Promise<void> {

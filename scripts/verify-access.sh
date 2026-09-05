@@ -63,6 +63,25 @@ check "$(seen "$PORTAL_LOGIN" '"redirectTo":"/portal"')" "yes" "Portal user is d
 check "$(status portal /workspace)" "307" "Portal user is bounced out of the internal workspace"
 
 echo
+echo "Privilege separation inside the admin area"
+echo "-------------------------------------------"
+login "manager@dealflow.test" mgr2 > /dev/null
+login "admin@dealflow.test" adm > /dev/null
+
+# A Sales Manager owns discount governance but not the product catalogue. Hiding the nav
+# link is not enough — the URL must be refused too.
+check "$(status mgr2 /admin/approval-rules)" "200" "Manager CAN reach approval rules (governance is theirs)"
+check "$(status mgr2 /admin/tier-ceilings)"  "200" "Manager CAN reach tier ceilings"
+check "$(status mgr2 /admin/risk-config)"    "200" "Manager CAN reach risk configuration"
+check "$(status mgr2 /admin/products)"       "307" "Manager CANNOT reach the product catalogue by URL"
+check "$(status mgr2 /admin/warehouses)"     "307" "Manager CANNOT reach warehouses by URL"
+check "$(status mgr2 /admin/price-lists)"    "307" "Manager CANNOT reach price lists by URL"
+check "$(status adm /admin/products)"        "200" "Admin CAN reach everything"
+
+NAV=$(page mgr2 /admin/approval-rules)
+check "$(seen "$NAV" '/admin/products')" "no" "A manager is not even shown the catalogue link"
+
+echo
 echo "-------------------------------------------"
 printf '  %d passed, %d failed\n' "$PASS" "$FAIL"
 echo "-------------------------------------------"
