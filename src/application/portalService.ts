@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/infrastructure/db";
-import { dbToPct } from "@/infrastructure/money";
+import { dbToPaise, paiseToDb, dbToPct } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
+import { netLineTotal } from "@/domain/upsell/recommend";
 import { DomainError } from "@/app/api/_lib/respond";
 import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
 import {
@@ -33,6 +34,20 @@ function assertPortalUser(user: SessionUser): string {
     throw new DomainError("This action is only available to a customer portal user.");
   }
   return user.customerId;
+}
+
+/**
+ * A line's unit price in paise, variant surcharge included.
+ *
+ * The surcharge is part of what the customer pays, so it is part of every figure derived
+ * from the unit price. Crossing to paise once, here, is what keeps the arithmetic below
+ * out of floating point.
+ */
+function unitPaise(line: {
+  unitPrice: unknown;
+  variant: { extraPrice: unknown } | null;
+}): number {
+  return dbToPaise(line.unitPrice as never) + dbToPaise((line.variant?.extraPrice ?? 0) as never);
 }
 
 export async function listPortalQuotations(user: SessionUser) {
@@ -89,15 +104,17 @@ export async function getPortalQuotation(user: SessionUser, quotationId: string)
       productName: l.product.name,
       description: l.product.description,
       quantity: l.quantity,
-      unitPrice: Number(l.unitPrice) + Number(l.variant?.extraPrice ?? 0),
+      unitPrice: paiseToDb(unitPaise(l)),
       discountPct: dbToPct(l.discountPct),
       lineType: l.lineType,
       planName: l.plan?.name ?? null,
-      // Computed here so the browser never receives unitCost.
-      lineTotal:
-        (Number(l.unitPrice) + Number(l.variant?.extraPrice ?? 0)) *
-        l.quantity *
-        (1 - dbToPct(l.discountPct) / 100),
+      // Computed here so the browser never receives unitCost, and computed in integer
+      // paise because this is money. The previous form multiplied rupees as floats —
+      // `(unitPrice + extraPrice) * qty * (1 - pct/100)` — which produced values like
+      // 10229.8977 in the payload. Nothing visibly wrong rendered, because the portal
+      // formats to whole rupees, but it was a float money calculation sitting outside the
+      // money boundary on the one screen a customer actually reads.
+      lineTotal: paiseToDb(netLineTotal(unitPaise(l), l.quantity, dbToPct(l.discountPct))),
     })),
     messages: quotation.negotiations.map((m) => ({
       id: m.id,
@@ -118,7 +135,7 @@ export async function getPortalQuotation(user: SessionUser, quotationId: string)
             type: i.type,
             status: i.status,
             amount: Number(i.amount),
-            paid: i.payments.reduce((s, p) => s + Number(p.amount), 0),
+            paid: paiseToDb(i.payments.reduce((s, p) => s + dbToPaise(p.amount), 0)),
           })),
         }
       : null,

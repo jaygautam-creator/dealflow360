@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/infrastructure/db";
-import { dbToPct } from "@/infrastructure/money";
+import { dbToPaise, paiseToDb, dbToPct } from "@/infrastructure/money";
 import { checkStalled, checkDiscountAnomaly, checkDeliverySlippage } from "@/domain/health/dealHealth";
 import { scopedQuotationWhere } from "./queries";
 import type { SessionUser } from "@/infrastructure/auth/session";
@@ -119,7 +119,7 @@ export async function buildHealthReport(user: SessionUser, now = new Date()): Pr
   for (const q of quotations) {
     const g = statusGroups.get(q.status) ?? { count: 0, value: 0 };
     g.count += 1;
-    g.value += Number(q.total);
+    g.value += dbToPaise(q.total);
     statusGroups.set(q.status, g);
   }
 
@@ -127,7 +127,7 @@ export async function buildHealthReport(user: SessionUser, now = new Date()): Pr
   for (const q of quotations) {
     const g = ownerGroups.get(q.owner.name) ?? { count: 0, value: 0, discountSum: 0 };
     g.count += 1;
-    g.value += Number(q.total);
+    g.value += dbToPaise(q.total);
     g.discountSum += meanDiscount(q.lines);
     ownerGroups.set(q.owner.name, g);
   }
@@ -141,8 +141,8 @@ export async function buildHealthReport(user: SessionUser, now = new Date()): Pr
     kpis: {
       openQuotations: open.length,
       awaitingApproval: quotations.filter((q) => q.status === "PENDING_MANAGER" || q.status === "PENDING_FINANCE").length,
-      confirmedValue: confirmed.reduce((s, q) => s + Number(q.total), 0),
-      openValue: open.reduce((s, q) => s + Number(q.total), 0),
+      confirmedValue: paiseToDb(confirmed.reduce((s, q) => s + dbToPaise(q.total), 0)),
+      openValue: paiseToDb(open.reduce((s, q) => s + dbToPaise(q.total), 0)),
       averageRiskScore:
         open.length === 0 ? 0 : Math.round((open.reduce((s, q) => s + dbToPct(q.riskScore), 0) / open.length) * 100) / 100,
       upsellAcceptedCount: upsellAccepted,
@@ -155,10 +155,12 @@ export async function buildHealthReport(user: SessionUser, now = new Date()): Pr
       productName: b.product.name,
       quantity: b.quantity,
     })),
-    byStatus: [...statusGroups.entries()].map(([status, g]) => ({ status, ...g })).sort((a, b) => b.count - a.count),
+    byStatus: [...statusGroups.entries()]
+      .map(([status, g]) => ({ status, count: g.count, value: paiseToDb(g.value) }))
+      .sort((a, b) => b.count - a.count),
     byOwner: [...ownerGroups.entries()]
       .map(([ownerName, g]) => ({
-        ownerName, count: g.count, value: g.value,
+        ownerName, count: g.count, value: paiseToDb(g.value),
         averageDiscount: Math.round((g.discountSum / g.count) * 100) / 100,
       }))
       .sort((a, b) => b.value - a.value),

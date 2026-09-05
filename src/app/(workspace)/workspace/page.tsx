@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { listQuotations } from "@/application/queries";
+import { dbToPaise, paiseToDb } from "@/infrastructure/money";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -37,9 +38,13 @@ export default async function PipelinePage() {
   // role whose guard will refuse it is how a permission boundary reads as a broken feature.
   const canCreate = can(user.role, P.QUOTATION_CREATE);
 
-  const totalValue = quotations
-    .filter((q) => q.status === "CONFIRMED")
-    .reduce((sum, q) => sum + Number(q.total), 0);
+  // Summed in integer paise and crossed back to rupees once, rather than adding rupee
+  // floats row by row. formatMoney below takes rupees, so the conversion belongs here.
+  const totalValue = paiseToDb(
+    quotations
+      .filter((q) => q.status === "CONFIRMED")
+      .reduce((sum, q) => sum + dbToPaise(q.total), 0),
+  );
   const awaiting = quotations.filter(
     (q) => q.status === "PENDING_MANAGER" || q.status === "PENDING_FINANCE",
   ).length;

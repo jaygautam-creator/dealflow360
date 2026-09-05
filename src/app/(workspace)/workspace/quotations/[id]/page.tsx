@@ -4,7 +4,7 @@ import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { getQuotation, auditTrail, catalogueForCustomer } from "@/application/queries";
 import { suggestionsFor } from "@/application/upsellService";
 import { monthEndOfferFor } from "@/application/promotionService";
-import { dbToPaise, dbToPct } from "@/infrastructure/money";
+import { dbToPaise, paiseToDb, dbToPct } from "@/infrastructure/money";
 import { QuotationBuilder } from "./QuotationBuilder";
 import type { RiskAssessment } from "@/domain/risk/types";
 
@@ -93,7 +93,7 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
             isProrated: i.isProrated,
             periodStart: i.periodStart?.toISOString() ?? null,
             periodEnd: i.periodEnd?.toISOString() ?? null,
-            paidAmount: i.payments.reduce((s, p) => s + Number(p.amount), 0),
+            paidAmount: paiseToDb(i.payments.reduce((s, p) => s + dbToPaise(p.amount), 0)),
           })),
           schedules: quotation.salesOrder.schedules.map((s) => ({
             id: s.id,
