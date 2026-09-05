@@ -48,6 +48,23 @@ post() { curl -s -b "$JAR/$1" -X POST "$BASE$2" -H 'Content-Type: application/js
 get()  { curl -s -b "$JAR/$1" "$BASE$2"; }
 
 echo
+b "Resetting to a known state"
+# The lifecycle assertions depend on exact seeded values — warehouse stock deep enough
+# on one side and thin on the other so a mixed order MUST split, a rep with a specific
+# discount history, particular tier and category ceilings. Any manual poking at the
+# database beforehand changes those, and the script then reports a failure that is really
+# just leftover state.
+#
+# So the script reseeds itself rather than trusting the caller to remember. It runs under
+# the lock acquired above, so this cannot disturb a concurrent run — there are none.
+if npm run db:seed >/dev/null 2>&1; then
+  dim "database reseeded"
+else
+  echo "  Could not reseed the database. Is PostgreSQL running (brew services start postgresql@16)?"
+  exit 1
+fi
+
+echo
 b "Warming routes"
 # The dev server compiles each route on its first request. A cold compile can take
 # seconds, which makes the first assertion against a given route look like a failure
