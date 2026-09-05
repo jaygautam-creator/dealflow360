@@ -115,21 +115,30 @@ export interface SlippageCheck {
   explanation: string;
 }
 
-/** Compares the date promised to the customer against what fulfilment can actually meet. */
+/**
+ * Compares the date promised to the customer against a reference date.
+ *
+ * The parameter is deliberately named `referenceDate` rather than anything implying a
+ * fulfilment estimate, because the only caller passes *today*. This system does not
+ * forecast a delivery date — it has stock levels and a warehouse split, not a lead-time
+ * model — so the honest claim is "the promised date has passed", not "fulfilment lands
+ * late". Saying the latter would report a prediction that was never computed, which is
+ * exactly the kind of number a decision trace exists to prevent.
+ */
 export function checkDeliverySlippage(
   promisedDate: Date | null,
-  earliestFulfillableDate: Date | null,
+  referenceDate: Date | null,
 ): SlippageCheck {
-  if (promisedDate === null || earliestFulfillableDate === null) {
+  if (promisedDate === null || referenceDate === null) {
     return { isSlipping: false, daysLate: 0, explanation: "No delivery promise recorded." };
   }
-  const daysLate = differenceInCalendarDays(earliestFulfillableDate, promisedDate);
+  const daysLate = differenceInCalendarDays(referenceDate, promisedDate);
   return {
     isSlipping: daysLate > 0,
     daysLate: Math.max(daysLate, 0),
     explanation:
       daysLate > 0
-        ? `Fulfilment lands ${daysLate} day(s) after the promised date.`
-        : `Fulfilment meets the promised date with ${Math.abs(daysLate)} day(s) to spare.`,
+        ? `The promised date has passed by ${daysLate} day(s) and the order is not out.`
+        : `${Math.abs(daysLate)} day(s) left before the promised date.`,
   };
 }

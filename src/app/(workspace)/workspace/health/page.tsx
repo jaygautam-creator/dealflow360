@@ -14,6 +14,10 @@ import { NudgeButton } from "./NudgeButton";
 export const metadata = { title: "Deal health — DealFlow360" };
 export const dynamic = "force-dynamic";
 
+/** Rows rendered per list. Counts and badges above still report the true totals — this
+    caps what is drawn, never what is measured. */
+const ROWS_SHOWN = 20;
+
 export default async function HealthPage() {
   const user = await requirePermissionPage(P.DASHBOARD_VIEW, "/workspace/health");
   const report = await buildHealthReport(user);
@@ -53,7 +57,7 @@ export default async function HealthPage() {
               </p>
             ) : (
               <ul className="space-y-3">
-                {report.anomalies.map((a) => (
+                {report.anomalies.slice(0, ROWS_SHOWN).map((a) => (
                   <li key={a.id} className="flex gap-2 rounded-lg border border-red-200 bg-red-50/50 p-3 transition hover:border-red-300 dark:border-red-900 dark:bg-red-950/20">
                     <Link href={`/workspace/quotations/${a.id}`} className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -70,6 +74,11 @@ export default async function HealthPage() {
                     <NudgeButton quotationId={a.id} />
                   </li>
                 ))}
+                {report.anomalies.length > ROWS_SHOWN ? (
+                  <li className="pt-1 text-xs text-neutral-500">
+                    Showing {ROWS_SHOWN} of {report.anomalies.length}.
+                  </li>
+                ) : null}
               </ul>
             )}
           </CardContent>
@@ -91,7 +100,7 @@ export default async function HealthPage() {
               <p className="text-sm text-neutral-500">Every open deal has been touched recently.</p>
             ) : (
               <ul className="space-y-2">
-                {report.stalled.map((s) => (
+                {report.stalled.slice(0, ROWS_SHOWN).map((s) => (
                   <li key={s.id} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 transition hover:border-amber-300 dark:border-neutral-800">
                     <Link href={`/workspace/quotations/${s.id}`} className="min-w-0 flex-1">
                       <div>
@@ -108,6 +117,11 @@ export default async function HealthPage() {
                     </div>
                   </li>
                 ))}
+                {report.stalled.length > ROWS_SHOWN ? (
+                  <li className="pt-1 text-xs text-neutral-500">
+                    Showing {ROWS_SHOWN} of {report.stalled.length}.
+                  </li>
+                ) : null}
               </ul>
             )}
           </CardContent>
@@ -129,7 +143,7 @@ export default async function HealthPage() {
               <p className="text-sm text-neutral-500">Every active delivery promise is currently on schedule.</p>
             ) : (
               <ul className="space-y-2">
-                {report.slipping.map((s) => (
+                {report.slipping.slice(0, ROWS_SHOWN).map((s) => (
                   <li key={s.id} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 transition hover:border-amber-300 dark:border-neutral-800">
                     <Link href={`/workspace/quotations/${s.id}`} className="min-w-0 flex-1">
                       <div>
@@ -146,6 +160,11 @@ export default async function HealthPage() {
                     </div>
                   </li>
                 ))}
+                {report.slipping.length > ROWS_SHOWN ? (
+                  <li className="pt-1 text-xs text-neutral-500">
+                    Showing {ROWS_SHOWN} of {report.slipping.length}.
+                  </li>
+                ) : null}
               </ul>
             )}
           </CardContent>

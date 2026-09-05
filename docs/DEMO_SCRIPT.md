@@ -143,8 +143,8 @@ This is where the demo becomes a conversation. Pick whichever lands.
 Open a terminal.
 
 ```bash
-npm test        # 125 unit tests, about a second
-npm run verify  # 57 assertions against the running server
+npm test        # 183 unit tests, about half a second
+npm run verify  # 62 assertions against the running server (29 access + 33 lifecycle)
 ```
 
 > "The business rules live in a layer that imports nothing — no framework, no database, no
@@ -173,6 +173,37 @@ Deal Health.
 > "A rep's discount is judged against *their own* history, not a company average. A rep who
 > habitually sells at 12% is not behaving oddly at 13%. A rep who never exceeds 3%
 > suddenly quoting 13% is. A single threshold cannot tell those apart."
+
+---
+
+## Scalability demonstration
+
+Optional extension if reviewers ask about volume or system performance.
+
+Warning: Bulk data floods the deal-health dashboard with synthetic anomalies, so it must not be loaded during the main demo.
+
+Exact command sequence:
+
+1. **Seed bulk quotations:**
+   ```bash
+   npm run db:seed:bulk
+   ```
+   Loads 405 quotations (45 across each of the 9 statuses) and 40 customers into local Postgres.
+
+2. **Show the pipeline board:**
+   Open `/workspace`. The board renders all columns and deal cards in ~0.3s without pagination lag.
+
+3. **Verify access control under volume:**
+   ```bash
+   npm run verify:access
+   ```
+   Confirms all 29 access and tenancy assertions still pass (29/29) with 405 quotations in the database.
+
+4. **Reset back to demo state:**
+   ```bash
+   npm run verify:flow
+   ```
+   Reseeds the database to the clean initial state as its first action and verifies the 33 lifecycle assertions.
 
 ---
 

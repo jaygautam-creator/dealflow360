@@ -76,16 +76,28 @@ describe("discount anomaly detection", () => {
 });
 
 describe("delivery slippage", () => {
-  it("flags fulfilment landing after the promised date", () => {
+  it("flags a promised date that has already passed", () => {
     const r = checkDeliverySlippage(new Date("2026-01-20"), new Date("2026-01-27"));
     expect(r.isSlipping).toBe(true);
     expect(r.daysLate).toBe(7);
   });
 
-  it("reports slack when fulfilment beats the promise", () => {
+  it("reports the remaining slack before the promised date", () => {
     const r = checkDeliverySlippage(new Date("2026-01-27"), new Date("2026-01-20"));
     expect(r.isSlipping).toBe(false);
     expect(r.daysLate).toBe(0);
+  });
+
+  // Guards the honesty of the wording: the system has no lead-time model, so the
+  // explanation must not claim a fulfilment estimate it never computed.
+  it("never claims a fulfilment forecast it did not compute", () => {
+    const late = checkDeliverySlippage(new Date("2026-01-20"), new Date("2026-01-27"));
+    const early = checkDeliverySlippage(new Date("2026-01-27"), new Date("2026-01-20"));
+    for (const r of [late, early]) {
+      expect(r.explanation.toLowerCase()).not.toContain("fulfilment");
+      expect(r.explanation.toLowerCase()).not.toContain("lands");
+    }
+    expect(late.explanation).toContain("promised date has passed");
   });
 
   it("stays quiet when no promise was made", () => {

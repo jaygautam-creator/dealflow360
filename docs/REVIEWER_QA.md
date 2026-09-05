@@ -55,7 +55,7 @@ Point at the folders, then the constraint:
 
 **Why that matters** — this is the answer that lands:
 
-> Because it makes the rules testable in isolation. 109 tests, 1.2 seconds, no database and
+> Because it makes the rules testable in isolation. 183 tests, ~0.5 seconds, no database and
 > no mocks. And it's the honest answer to "did you actually implement this, or fake it for
 > the demo" — the rules are isolated enough to be tested directly, and they are.
 
@@ -174,7 +174,7 @@ For each: the simple sentence first, then the depth if they push.
 
 This is the question the spec practically promises they'll ask. Three answers, escalating:
 
-1. **Run the tests.** `npm test` — 109 tests in about a second. Open
+1. **Run the tests.** `npm test` — 183 tests in about half a second. Open
    `src/domain/risk/blendedRisk.test.ts`; the worked example from their own problem
    statement is in there as a test case.
 2. **Change a rule live.** Open the admin screen, change the aggregate amplifier or an
@@ -322,3 +322,70 @@ Answer plainly and move on:
 That reframes the question into an invitation to demonstrate understanding, which is what
 they actually want to test. A denial that falls apart under a code walkthrough is far worse
 than a straight answer.
+
+---
+
+## 13. Questions from the Odoo review
+
+### 13.1 "Why did Finance clicking 'New Quotation' give a 404?"
+
+`requirePermissionPage` in `src/infrastructure/auth/guards.ts:44` redirected unauthorised internal sessions to `/403`. Because the `/403` page route did not exist in the Next.js router, the framework rendered a generic 404 ("Not Found"). This made an access boundary look like a missing feature.
+
+The boundary is now closed on both sides:
+1. The page exists at `src/app/403/page.tsx:21` (`ForbiddenPage`), naming the boundary and the user's role rather than hiding behind a missing route.
+2. The "New Quotation" button is hidden from roles without `QUOTATION_CREATE` using `can(user.role, P.QUOTATION_CREATE)` in both `src/app/(workspace)/workspace/page.tsx:38` and `src/app/(workspace)/workspace/quotations/page.tsx:27`. If a Finance user navigates directly to `/workspace/quotations/new`, line 11 invokes `await requirePermissionPage(P.QUOTATION_CREATE, "/workspace/quotations/new")` and redirects cleanly to `/403`.
+
+### 13.2 "Could a customer request a 100% discount on the portal?"
+
+It is capped at 30% in `src/domain/negotiation/counterOffer.ts:24` (`MAX_REQUESTABLE_DISCOUNT_PCT = 30`) and screened via `screenCounterOffer()` in `src/domain/negotiation/counterOffer.ts:36-59`.
+
+Crucially, an over-cap ask is not dropped with a silent HTTP 400 error. In `src/application/portalService.ts:161-201`, the system records the counter-offer message with `status: "DECLINED"` (`portalService.ts:174`), writes an audit event with action `"COUNTER_OFFER_AUTO_DECLINED"` (`portalService.ts:182`), and explains the refusal to the customer. The quotation's status is deliberately left unchanged instead of moving to `UNDER_NEGOTIATION`, preventing frivolous submissions from landing on a sales representative's active board.
+
+### 13.3 "How do month-end offers work without breaking discount governance?"
+
+Month-end promotion evaluation lives in `src/domain/promotion/monthEnd.ts:112-179`.
+
+Promotions are the classic backdoor through which discount limits get quietly bypassed. To prevent this, `evaluateMonthEndOffer` clamps the bonus against the product category's existing ceiling in `src/domain/promotion/monthEnd.ts:138-140`:
+```ts
+const headroom = Math.max(0, line.categoryMaxDiscountPct - line.currentDiscountPct);
+const bonusPct = roundPct(Math.min(policy.bonusDiscountPct, headroom));
+```
+A promotion can never push a line past governance: a line already sitting at its category ceiling receives a 0% bonus and states why in the decision trace (`monthEnd.ts:150-155`). Any bonus that is granted increases the discount rate and feeds back into normal quotation re-scoring and approval routing.
+
+### 13.4 "Can anyone edit a generated invoice?"
+
+No. No route, server action, or admin screen in the codebase writes to an invoice's `amount`, `number`, or `salesOrderId`.
+
+The only two invoice writes in the entire application are strict status transitions executed inside database transactions:
+1. `src/application/paymentService.ts:48`: `await tx.invoice.update({ where: { id: invoiceId }, data: { status: "PAID" } })` when incoming funds fully settle the balance.
+2. `src/application/subscriptionService.ts:286`: `await tx.invoice.update({ where: { id: invoice.id }, data: { status: "CREDITED" } })` when credit notes fully offset the invoice on cancellation.
+
+A reviewer can verify this directly across the codebase with:
+```bash
+grep -rn "invoice\.update" src/
+```
+
+### 13.5 "Does the system scale beyond demo data?"
+
+Yes. Run:
+```bash
+npm run db:seed:bulk
+```
+This executes `prisma/seed-bulk.ts`, populating the database with 405 quotations (45 quotations evenly spread across all 9 quotation statuses) and 40 customers across Bronze, Silver, and Gold tiers.
+
+With 405 quotations loaded, the pipeline board (`/workspace`) renders in approximately 0.3s. Tenancy and role scoping remain completely solid under volume: `npm run verify:access` still passes all 29/29 assertions against the populated database.
+
+### 13.6 "Could a sales rep fake a subscription start date to game commission?"
+
+No. In `src/application/confirmationService.ts:310`, confirmation uses the server timestamp:
+```ts
+const confirmedAt = new Date();
+```
+The confirmation API handler at `src/app/api/quotations/[id]/confirm/route.ts:7-15` takes only the quotation ID from route parameters and accepts no request body. Because no request payload is parsed, there is no field through which a client or representative can supply a date. Subscription billing schedules and invoice dates derive strictly from `confirmedAt`.
+
+### 13.7 "Are the business rules real or faked for the demo?"
+
+They are completely real and strictly isolated:
+1. `src/domain` contains zero dependencies on Prisma, Next.js, React, or external packages (verify with `grep -rn "from " src/domain/`). Every rule is a pure function.
+2. Because the domain layer has no I/O, database, or clock dependencies, `npm test` executes the complete suite of 183 unit tests with zero mocks in approximately 0.45s.
+3. For live verification, `scripts/verify-flow.sh` walks the problem statement's Section 9 end-to-end lifecycle flow against the live Next.js HTTP server (`http://localhost:3000`), testing real database transactions, multi-warehouse stock allocations, and approval chains.

@@ -26,7 +26,7 @@ npm run dev                           # http://localhost:3000
 ```
 
 ```bash
-npm test              # 153 unit tests, ~0.5s
+npm test              # 183 unit tests, ~0.5s
 npm run verify        # 62 live assertions against the running server
 npx tsc --noEmit      # typecheck
 npm run build         # NEVER while `npm run dev` is running — it rewrites .next underneath it
@@ -70,7 +70,7 @@ src/components/      UI            Presentational component library.
 src/proxy.ts         Pipeline      Path-to-permission enforcement before a route renders.
 ```
 
-`src/domain` importing nothing is what makes 153 tests run in half a second with no database
+`src/domain` importing nothing is what makes 183 tests run in half a second with no database
 and no mocks — and it is the honest answer to "did you really implement these rules?"
 
 **Non-negotiable conventions:**
@@ -90,17 +90,18 @@ and no mocks — and it is the honest answer to "did you really implement these 
 
 | Gate | Result |
 |---|---|
-| Unit tests | 153 |
+| Unit tests | 183 |
 | Live access assertions | 29 |
 | Live lifecycle assertions | 33 |
 | Production build | clean |
 
 **Built:** six domain engines (blended risk scoring, approval routing, greedy set-cover
 warehouse split, hybrid billing + proration, per-rep z-score anomaly detection, upsell
-ranking) · full schema + seed · auth, RBAC matrix, request-pipeline path guards · quotation
-/ approval / confirmation / portal / payment / health services · the whole admin config
-area (9 screens) · pipeline board, quotations table, quotation builder with live risk
-trace, approval queue, deal-health dashboard, orders / invoices / subscriptions lists ·
+ranking) · counter-offer cap · month-end promotion engine · /403 page · bulk data generator ·
+admin audit trail on all config screens · full schema + seed · auth, RBAC matrix,
+request-pipeline path guards · quotation / approval / confirmation / portal / payment / health services ·
+the whole admin config area (9 screens) · pipeline board, quotations table, quotation builder
+with live risk trace, approval queue, deal-health dashboard, orders / invoices / subscriptions lists ·
 customer portal with negotiation · reports with filters and CSV/XLS export · manual
 fulfilment override and backorder consolidation · subscription modify / cancel with
 credit notes · signup, workspace top-bar actions, upsell dismiss, deal-health nudge ·
@@ -110,20 +111,26 @@ credit notes · signup, workspace top-bar actions, upsell dismiss, deal-health n
 statement's own Section 9 test flow; it reseeds itself and holds a lock, so it is
 deterministic from any starting state.
 
+### Demo sequencing
+
+- `npm run verify:flow` reseeds the database as its first action and wipes bulk data.
+- Run `npm run db:seed:bulk` **after** `verify:flow`, never before.
+- `npm run verify:access` does **not** reseed, so it can run safely against either seed state without clearing bulk records.
+
 ---
 
-## Backlog — highest value first
+## Backlog
 
-Everything below is a genuine gap against the problem statement, not polish.
+The backlog is empty. There are no remaining open items against the problem statement or technical specification.
 
-1. **Product variants in the quotation builder** — the schema (`ProductVariant`), the
-   admin screen and the `POST /api/quotations/[id]/lines` route all support variants
-   already; `QuotationBuilder.tsx` never offers the choice. The last real spec gap
-   (A2 reaching B3).
+All items previously on this list — product variants in the quotation builder, reports with filters and export, manual warehouse override, backorder consolidation, and subscription modify / cancel with credit notes — are implemented, wired into the UI, and verified by tests.
 
-Everything else that was on this list — reports with filters and export (A7), manual
-warehouse override (B6), backorder consolidation (B6), and subscription modify / cancel
-with credit notes (B7) — is now built and reachable from the UI.
+---
+
+## Known Limitations
+
+- **Month-end window and bonus are domain constants:** In `src/domain/promotion/monthEnd.ts`, the month-end promotion window (7 days) and bonus discount (3%) are domain constants (`DEFAULT_MONTH_END_POLICY`) rather than configurable database table rows.
+- **Bulk generator quotation boundaries:** The bulk generator (`prisma/seed-bulk.ts`) creates `CONFIRMED` quotations without downstream `SalesOrder` records because orders are produced by the atomic confirmation transaction (`confirmationService.ts`), and fabricating orders directly in seed data would misrepresent what the system actually executed.
 
 ---
 
