@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt, Send, MessageSquare, Check, X } from "lucide-react";
+import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt, Send, MessageSquare, Check, X, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/Select";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RiskPanel } from "./RiskPanel";
 import type { RiskAssessment } from "@/domain/risk/types";
+import type { MonthEndOffer } from "@/domain/promotion/monthEnd";
 
 interface Line {
   id: string; productId: string; productName: string; variantLabel: string | null; categoryName: string;
@@ -37,7 +38,7 @@ interface Negotiation {
 }
 
 export function QuotationBuilder({
-  quotation, negotiations, assessment, initialSuggestions, products, audit, permissions,
+  quotation, negotiations, assessment, initialSuggestions, monthEndOffer, products, audit, permissions,
 }: {
   quotation: {
     id: string; number: string; status: string; customerName: string; customerTier: string;
@@ -54,6 +55,7 @@ export function QuotationBuilder({
   negotiations: Negotiation[];
   assessment: RiskAssessment | null;
   initialSuggestions: Suggestion[];
+  monthEndOffer: MonthEndOffer | null;
   products: ProductOption[];
   audit: { id: string; action: string; reason: string | null; actorName: string; createdAt: string }[];
   permissions: { mayEdit: boolean; mayApproveManager: boolean; mayApproveFinance: boolean; mayConfirm: boolean; isOwner: boolean };
@@ -377,6 +379,11 @@ export function QuotationBuilder({
             />
           ) : null}
 
+          {/* Gated the same way the upsell panel is: a confirmed, invoiced deal cannot
+              take a discount, so offering one there is noise on a screen that is now a
+              record rather than a workspace. */}
+          {editable ? <MonthEndOfferPanel offer={monthEndOffer} /> : null}
+
           {editable && suggestions.length > 0 ? (
             <Card>
               <CardHeader>
@@ -426,6 +433,70 @@ export function QuotationBuilder({
         </div>
       </div>
     </div>
+  );
+}
+
+function MonthEndOfferPanel({ offer }: { offer: MonthEndOffer | null }) {
+  // Outside the window the server sends null, so there is nothing here to render and
+  // nothing in the page source either. A rep who could see "you'll be able to give 3% in
+  // 25 days" would tell the customer, turning a month-end incentive into a reason to
+  // wait — the exact opposite of what the promotion is for.
+  if (!offer || !offer.eligible) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="size-4" />Month-end offer
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{offer.reason}</p>
+
+        {offer.lineBonuses.map((b) => (
+          <div key={b.lineId} className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 break-words text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <span>{b.productName}</span>
+                  <span className="text-xs font-normal tabular-nums text-neutral-500">
+                    {b.currentDiscountPct}% → {b.resultingDiscountPct}%
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-500">{b.reason}</p>
+              </div>
+              <span className="shrink-0 text-sm tabular-nums font-medium text-neutral-900 dark:text-neutral-100">
+                {money(b.savingPaise / 100)}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        <div className="flex items-center justify-between border-t border-neutral-200 pt-3 text-sm dark:border-neutral-800">
+          <span className="font-medium text-neutral-700 dark:text-neutral-300">Total saving</span>
+          <span className="font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+            {money(offer.totalSavingPaise / 100)}
+          </span>
+        </div>
+
+        {offer.gift ? (
+          <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2 break-words text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <span>{offer.gift.productName}</span>
+                  <Badge tone="success">free</Badge>
+                </div>
+                <p className="mt-0.5 text-xs text-neutral-500">{offer.gift.reason}</p>
+              </div>
+              <span className="shrink-0 text-sm tabular-nums text-neutral-500">
+                {money(offer.gift.listPricePaise / 100)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

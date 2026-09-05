@@ -3,6 +3,7 @@ import { requireUserPage } from "@/infrastructure/auth/guards";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { getQuotation, auditTrail, catalogueForCustomer } from "@/application/queries";
 import { suggestionsFor } from "@/application/upsellService";
+import { monthEndOfferFor } from "@/application/promotionService";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
 import { QuotationBuilder } from "./QuotationBuilder";
 import type { RiskAssessment } from "@/domain/risk/types";
@@ -18,10 +19,11 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
   const quotation = await getQuotation(user, id);
   if (!quotation) notFound();
 
-  const [catalogue, suggestions, audit] = await Promise.all([
+  const [catalogue, suggestions, audit, monthEndOffer] = await Promise.all([
     catalogueForCustomer(quotation.customerId),
     suggestionsFor(quotation.id),
     auditTrail("Quotation", quotation.id),
+    monthEndOfferFor(quotation.id),
   ]);
 
   // Prisma Decimals cannot cross the server/client boundary, so the view model is built
@@ -128,6 +130,10 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       negotiations={negotiations}
       assessment={assessment}
       initialSuggestions={suggestions}
+      // Decided here, not in the component. Returning null from the panel would still
+      // serialise the whole offer into the RSC payload, so "25 days remain" would sit in
+      // view-source for any rep to read. An offer that is not live is not sent at all.
+      monthEndOffer={monthEndOffer.eligible ? monthEndOffer : null}
       products={catalogue.products.map((p) => ({
         id: p.id,
         name: p.name,
