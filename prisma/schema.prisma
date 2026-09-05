@@ -132,6 +132,10 @@ model Product {
 
   @@index([categoryId])
   @@index([kind])
+  // Postgres does not index foreign keys automatically. Indexed here because the
+  // application filters on this column; the FKs it never filters on are deliberately left
+  // unindexed rather than adding write cost for a query nobody runs.
+  @@index([defaultPlanId])
 }
 
 model ProductVariant {
@@ -166,6 +170,10 @@ model PriceListItem {
   price       Decimal   @db.Decimal(14, 2)
 
   @@unique([priceListId, productId])
+  // Postgres does not index foreign keys automatically. Indexed here because the
+  // application filters on this column; the FKs it never filters on are deliberately left
+  // unindexed rather than adding write cost for a query nobody runs.
+  @@index([productId])
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -434,6 +442,11 @@ model QuotationLine {
 
   @@index([quotationId])
   @@index([productId])
+  // Postgres does not index foreign keys automatically. Indexed here because the
+  // application filters on this column; the FKs it never filters on are deliberately left
+  // unindexed rather than adding write cost for a query nobody runs.
+  @@index([variantId])
+  @@index([planId])
 }
 
 enum ApprovalStatus {
@@ -566,6 +579,12 @@ model FulfillmentAllocation {
   isBackorder  Boolean @default(false)
 
   @@index([planId])
+  // Postgres does not index foreign keys automatically. Indexed here because the
+  // application filters on this column; the FKs it never filters on are deliberately left
+  // unindexed rather than adding write cost for a query nobody runs.
+  @@index([lineId])
+  @@index([productId])
+  @@index([warehouseId])
 }
 
 enum InvoiceType {
@@ -664,6 +683,11 @@ model BillingSchedule {
 
   @@index([salesOrderId])
   @@index([nextBillingDate])
+  // Postgres does not index foreign keys automatically. Indexed here because the
+  // application filters on this column; the FKs it never filters on are deliberately left
+  // unindexed rather than adding write cost for a query nobody runs.
+  @@index([lineId])
+  @@index([planId])
 }
 
 // ─────────────────────────────────────────────────────────────
