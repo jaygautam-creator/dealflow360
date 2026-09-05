@@ -27,6 +27,7 @@ export const PERMISSIONS = {
   BILLING_MANAGE: "billing:manage",
   CONFIG_MANAGE: "config:manage",
   CONFIG_APPROVAL_CHAIN: "config:approval-chain",
+  CONFIG_PROMOTION: "config:promotion",
   DASHBOARD_VIEW: "dashboard:view",
   PORTAL_VIEW: "portal:view",
   USER_MANAGE: "user:manage",
@@ -67,6 +68,10 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     P.DASHBOARD_VIEW,
     // A manager configures discount tiers and approval chains, but not the whole system.
     P.CONFIG_APPROVAL_CHAIN,
+    // Month-end promotions are a commercial lever a sales manager owns, like tier
+    // ceilings. The clamp that keeps a promotion inside category policy is not editable
+    // from anywhere, so granting this cannot widen what a manager may give away.
+    P.CONFIG_PROMOTION,
   ],
 
   FINANCE: [

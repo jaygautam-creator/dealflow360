@@ -175,6 +175,40 @@ model TierDiscountCeiling {
   maxDiscountPct Decimal      @db.Decimal(5, 2)
 }
 
+// Month-end promotion policy, editable at runtime by an administrator or a sales manager.
+//
+// The window and the bonus are commercial levers a business retunes per quarter, so they
+// belong in a table for the same reason tier ceilings and approval bands do: changing a
+// row here changes the very next quotation, with no redeploy.
+//
+// What is deliberately NOT tunable here is the clamp. A bonus is always trimmed to the
+// product category's own ceiling, so raising bonusDiscountPct can never push a line past
+// governance — the promotion is a lever, not a bypass. Putting the clamp in this table
+// would be handing someone a switch to turn discount policy off.
+//
+// No row is a valid state: the engine falls back to its tested defaults, so the feature
+// behaves identically on a database where nobody has configured anything.
+model MonthEndPromotion {
+  id   String @id @default(cuid())
+  name String
+
+  /// How many days before the end of the month the offer opens. 7 covers the 25th onward.
+  windowDays Int @default(7)
+
+  /// Extra discount points offered inside the window, before the category clamp.
+  bonusDiscountPct Decimal @db.Decimal(5, 2)
+
+  /// A gift may not exceed this share of order value.
+  maxGiftShareOfOrderPct Decimal @db.Decimal(5, 2)
+
+  /// Only one promotion applies at a time: the most recently updated active row wins.
+  isActive Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, updatedAt])
+}
+
 enum ApprovalLevel {
   SALES_MANAGER
   FINANCE

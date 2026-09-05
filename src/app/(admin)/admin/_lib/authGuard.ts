@@ -36,3 +36,8 @@ export function guardConfigManage(): Promise<GuardResult> {
 export function guardConfigWrite(): Promise<GuardResult> {
   return checkPermission((role) => canAny(role, [P.CONFIG_MANAGE, P.CONFIG_APPROVAL_CHAIN]));
 }
+
+/** Month-end promotions: a sales manager owns this lever alongside tier ceilings. */
+export function guardPromotionWrite(): Promise<GuardResult> {
+  return checkPermission((role) => canAny(role, [P.CONFIG_MANAGE, P.CONFIG_PROMOTION]));
+}

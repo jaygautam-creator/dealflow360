@@ -33,6 +33,17 @@ describe("RBAC — role capabilities", () => {
     expect(can("SALES_MANAGER", P.USER_MANAGE)).toBe(false);
   });
 
+  it("lets a manager own month-end promotions, which are a commercial lever like ceilings", () => {
+    expect(can("SALES_MANAGER", P.CONFIG_PROMOTION)).toBe(true);
+    expect(can("ADMIN", P.CONFIG_PROMOTION)).toBe(true);
+  });
+
+  it("keeps promotions away from reps, finance and portal users", () => {
+    expect(can("SALES_REP", P.CONFIG_PROMOTION)).toBe(false);
+    expect(can("FINANCE", P.CONFIG_PROMOTION)).toBe(false);
+    expect(can("PORTAL", P.CONFIG_PROMOTION)).toBe(false);
+  });
+
   it("lets finance approve at their level, override fulfilment and manage billing", () => {
     expect(canAll("FINANCE", [P.APPROVE_AS_FINANCE, P.FULFILLMENT_OVERRIDE, P.BILLING_MANAGE])).toBe(true);
   });

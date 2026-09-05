@@ -7,6 +7,7 @@ import {
   type GiftCandidate,
   type MonthEndLineInput,
   type MonthEndOffer,
+  type MonthEndPolicy,
 } from "@/domain/promotion/monthEnd";
 
 /**
@@ -73,10 +74,22 @@ export async function monthEndOfferFor(
     });
   }
 
-  return evaluateMonthEndOffer(
-    today,
-    lines,
-    [...giftById.values()],
-    DEFAULT_MONTH_END_POLICY,
-  );
+  // Policy comes from the table when a manager has configured one, and falls back to the
+  // tested defaults otherwise. "No row" is a supported state, not a broken one: the
+  // feature behaves identically on a database nobody has touched, which is what makes the
+  // table additive rather than a new way for the offer to stop working.
+  const configured = await prisma.monthEndPromotion.findFirst({
+    where: { isActive: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const policy: MonthEndPolicy = configured
+    ? {
+        windowDays: configured.windowDays,
+        bonusDiscountPct: dbToPct(configured.bonusDiscountPct),
+        maxGiftShareOfOrderPct: dbToPct(configured.maxGiftShareOfOrderPct),
+      }
+    : DEFAULT_MONTH_END_POLICY;
+
+  return evaluateMonthEndOffer(today, lines, [...giftById.values()], policy);
 }

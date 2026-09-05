@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Overview", href: "/admin", permission: null },
   { label: "Approval Rules", href: "/admin/approval-rules", permission: P.CONFIG_APPROVAL_CHAIN },
   { label: "Tier Ceilings", href: "/admin/tier-ceilings", permission: P.CONFIG_APPROVAL_CHAIN },
+  { label: "Month-End Offers", href: "/admin/month-end-offers", permission: P.CONFIG_PROMOTION },
   { label: "Risk Config", href: "/admin/risk-config", permission: P.CONFIG_APPROVAL_CHAIN },
   { label: "Customers", href: "/admin/customers", permission: P.CONFIG_MANAGE },
   { label: "Products", href: "/admin/products", permission: P.CONFIG_MANAGE },
