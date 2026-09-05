@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { requirePermissionApi } from "@/infrastructure/auth/guards";
+import { requirePermissionApi, assertCanMutateQuotation } from "@/infrastructure/auth/guards";
 import { PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { apiError } from "@/app/api/_lib/respond";
 import { addLine } from "@/application/lineService";
 import { suggestionsFor } from "@/application/upsellService";
+import { prisma } from "@/infrastructure/db";
 
 const AddLineSchema = z.object({
   productId: z.string().min(1),
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const { id } = await ctx.params;
     const input = AddLineSchema.parse(await request.json());
 
-    const result = await addLine(id, input, user.id);
+    const result = await addLine(id, input, user);
     return NextResponse.json({ ...result, suggestions: await suggestionsFor(id) });
   } catch (error) {
     return apiError(error);
@@ -31,8 +32,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
 /** Live upsell suggestions for the quotation as it currently stands. */
 export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermissionApi(P.QUOTATION_UPDATE);
+    const user = await requirePermissionApi(P.QUOTATION_UPDATE);
     const { id } = await ctx.params;
+    const quotation = await prisma.quotation.findUniqueOrThrow({
+      where: { id },
+      select: { ownerId: true },
+    });
+    assertCanMutateQuotation(user, quotation);
     return NextResponse.json({ suggestions: await suggestionsFor(id) });
   } catch (error) {
     return apiError(error);

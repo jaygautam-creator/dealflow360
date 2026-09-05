@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { dbToPct } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
+import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
+import type { Role } from "@/generated/prisma";
 
 /**
  * Line editing.
@@ -15,11 +17,17 @@ import { DomainError } from "@/app/api/_lib/respond";
 /** Statuses in which a quotation's lines may still be edited. */
 const EDITABLE = new Set(["DRAFT", "APPROVED", "SENT", "UNDER_NEGOTIATION"]);
 
-async function assertEditable(quotationId: string) {
+async function assertEditable(
+  quotationId: string,
+  actor?: { id: string; role?: Role } | string,
+) {
   const q = await prisma.quotation.findUniqueOrThrow({
     where: { id: quotationId },
-    select: { status: true, riskScore: true, salesOrder: { select: { id: true } } },
+    select: { id: true, ownerId: true, status: true, riskScore: true, salesOrder: { select: { id: true } } },
   });
+  if (actor) {
+    assertCanMutateQuotation(actor, q);
+  }
   if (q.salesOrder) throw new DomainError("This quotation has been confirmed and can no longer be edited.");
   if (!EDITABLE.has(q.status)) {
     throw new DomainError(`A quotation in ${q.status} state cannot be edited.`);
@@ -30,9 +38,11 @@ async function assertEditable(quotationId: string) {
 export async function addLine(
   quotationId: string,
   input: { productId: string; variantId?: string | null; quantity: number; discountPct: number; fromUpsell?: boolean },
-  actorId: string,
+  actor: { id: string; role?: Role } | string,
 ) {
-  const before = await assertEditable(quotationId);
+  const before = await assertEditable(quotationId, actor);
+  const actorId = typeof actor === "string" ? actor : actor.id;
+
 
   return prisma.$transaction(async (tx) => {
     // Independent reads, issued together. Each sequential await is a full round trip to
@@ -86,13 +96,14 @@ export async function addLine(
 export async function updateLine(
   lineId: string,
   input: { quantity?: number; discountPct?: number },
-  actorId: string,
+  actor: { id: string; role?: Role } | string,
 ) {
   const line = await prisma.quotationLine.findUniqueOrThrow({
     where: { id: lineId },
     include: { product: true },
   });
-  const before = await assertEditable(line.quotationId);
+  const before = await assertEditable(line.quotationId, actor);
+  const actorId = typeof actor === "string" ? actor : actor.id;
 
   return prisma.$transaction(async (tx) => {
     const previousDiscount = dbToPct(line.discountPct);
@@ -122,12 +133,16 @@ export async function updateLine(
   });
 }
 
-export async function removeLine(lineId: string, actorId: string) {
+export async function removeLine(
+  lineId: string,
+  actor: { id: string; role?: Role } | string,
+) {
   const line = await prisma.quotationLine.findUniqueOrThrow({
     where: { id: lineId },
     include: { product: true },
   });
-  const before = await assertEditable(line.quotationId);
+  const before = await assertEditable(line.quotationId, actor);
+  const actorId = typeof actor === "string" ? actor : actor.id;
 
   return prisma.$transaction(async (tx) => {
     await tx.quotationLine.delete({ where: { id: lineId } });

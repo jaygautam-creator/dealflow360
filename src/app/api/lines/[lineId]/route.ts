@@ -22,7 +22,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ lineI
     const { lineId } = await ctx.params;
     const input = UpdateSchema.parse(await request.json());
 
-    const result = await updateLine(lineId, input, user.id);
+    const result = await updateLine(lineId, input, user);
     const line = await prisma.quotationLine.findUniqueOrThrow({
       where: { id: lineId },
       select: { quotationId: true },
@@ -42,7 +42,7 @@ export async function DELETE(_request: NextRequest, ctx: { params: Promise<{ lin
       where: { id: lineId },
       select: { quotationId: true },
     });
-    const result = await removeLine(lineId, user.id);
+    const result = await removeLine(lineId, user);
     return NextResponse.json({ ...result, suggestions: await suggestionsFor(line.quotationId) });
   } catch (error) {
     return apiError(error);

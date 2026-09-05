@@ -1,7 +1,8 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { AuthError, getSession, type SessionUser } from "./session";
-import { can, type Permission } from "./rbac";
+import { can, canMutateQuotation, type Permission } from "./rbac";
+import type { Role } from "@/generated/prisma";
 
 /**
  * Guards used by Server Components and Route Handlers.
@@ -51,3 +52,24 @@ export async function requirePermissionApi(permission: Permission): Promise<Sess
   }
   return user;
 }
+
+/**
+ * Asserts that the actor has permission and ownership rights to mutate the quotation.
+ * Throws AuthError (403) if unauthorized.
+ */
+export function assertCanMutateQuotation(
+  actor: { id: string; role?: Role } | string,
+  quotation: { ownerId: string },
+): void {
+  const actorObj = typeof actor === "string" ? { id: actor, role: undefined } : actor;
+  if (actorObj.role) {
+    if (!canMutateQuotation({ id: actorObj.id, role: actorObj.role }, quotation)) {
+      throw new AuthError("You may only modify quotations you own.", 403);
+    }
+  } else {
+    if (quotation.ownerId !== actorObj.id) {
+      throw new AuthError("You may only modify quotations you own.", 403);
+    }
+  }
+}
+

@@ -10,7 +10,8 @@ import { applyPct } from "@/domain/shared/money";
 import { addDays } from "@/domain/shared/dates";
 import { writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
-import type { Prisma } from "@/generated/prisma";
+import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
+import type { Prisma, Role } from "@/generated/prisma";
 
 /**
  * Order confirmation.
@@ -41,8 +42,9 @@ export interface ConfirmationResult {
 
 export async function confirmQuotation(
   quotationId: string,
-  actorId: string,
+  actor: { id: string; role?: Role } | string,
 ): Promise<ConfirmationResult> {
+  const actorId = typeof actor === "string" ? actor : actor.id;
   return prisma.$transaction(async (tx) => {
     const quotation = await tx.quotation.findUniqueOrThrow({
       where: { id: quotationId },
@@ -51,6 +53,8 @@ export async function confirmQuotation(
         salesOrder: true,
       },
     });
+
+    assertCanMutateQuotation(actor, quotation);
 
     // Guard the state machine rather than trusting the caller's screen to be current.
     if (quotation.salesOrder) {

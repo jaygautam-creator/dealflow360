@@ -18,10 +18,10 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
     const { action, reason } = RespondSchema.parse(await request.json());
 
     if (action === "ACCEPT") {
-      return NextResponse.json(await acceptCounterOffer(id, { id: user.id }));
+      return NextResponse.json(await acceptCounterOffer(id, user));
     }
     return NextResponse.json(
-      await declineCounterOffer(id, { id: user.id }, reason ?? "The requested discount was not approved."),
+      await declineCounterOffer(id, user, reason ?? "The requested discount was not approved."),
     );
   } catch (error) {
     return apiError(error);

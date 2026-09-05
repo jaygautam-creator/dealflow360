@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { dbToPct } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
+import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
+import type { Role } from "@/generated/prisma";
 import type { SessionUser } from "@/infrastructure/auth/session";
 
 /**
@@ -135,10 +137,18 @@ export async function postNegotiation(
 
   const quotation = await prisma.quotation.findFirst({
     where: { id: quotationId, customerId, status: { in: [...CUSTOMER_VISIBLE] } },
+    include: { lines: { select: { id: true } } },
   });
   if (!quotation) throw new DomainError("Quotation not found.");
   if (quotation.status === "CONFIRMED") {
     throw new DomainError("This quotation is already confirmed and can no longer be negotiated.");
+  }
+
+  if (input.lineId) {
+    const validLine = quotation.lines.some((l) => l.id === input.lineId);
+    if (!validLine) {
+      throw new DomainError("The specified line does not belong to this quotation.");
+    }
   }
 
   return prisma.$transaction(async (tx) => {
@@ -184,12 +194,15 @@ export async function postNegotiation(
  */
 export async function acceptCounterOffer(
   messageId: string,
-  actor: { id: string },
+  actor: { id: string; role?: Role } | string,
 ): Promise<{ applied: boolean; reapprovalRequired: boolean; reason: string; riskScore: number }> {
+  const actorId = typeof actor === "string" ? actor : actor.id;
   const message = await prisma.negotiationMessage.findUniqueOrThrow({
     where: { id: messageId },
-    include: { quotation: true },
+    include: { quotation: { select: { id: true, ownerId: true, riskScore: true } } },
   });
+
+  assertCanMutateQuotation(actor, message.quotation);
 
   if (message.requestedDiscountPct === null) {
     throw new DomainError("This message is a question, not a discount request.");
@@ -203,8 +216,14 @@ export async function acceptCounterOffer(
 
   return prisma.$transaction(async (tx) => {
     if (message.lineId) {
+      const line = await tx.quotationLine.findFirst({
+        where: { id: message.lineId, quotationId: message.quotationId },
+      });
+      if (!line) {
+        throw new DomainError("The specified line does not belong to this quotation.");
+      }
       await tx.quotationLine.update({
-        where: { id: message.lineId },
+        where: { id: line.id },
         data: { discountPct: requested },
       });
     } else {
@@ -222,12 +241,12 @@ export async function acceptCounterOffer(
       entityType: "Quotation",
       entityId: message.quotationId,
       action: "COUNTER_OFFER_ACCEPTED",
-      actorId: actor.id,
+      actorId,
       reason: `Applied customer's requested ${requested}%`,
       payload: { messageId, requestedDiscountPct: requested, lineId: message.lineId },
     });
 
-    const rescore = await rescoreAfterEdit(tx, message.quotationId, previousScore, actor.id);
+    const rescore = await rescoreAfterEdit(tx, message.quotationId, previousScore, actorId);
     return {
       applied: true,
       reapprovalRequired: rescore.reapprovalRequired,
@@ -237,20 +256,30 @@ export async function acceptCounterOffer(
   });
 }
 
-export async function declineCounterOffer(messageId: string, actor: { id: string }, reason: string) {
-  const message = await prisma.negotiationMessage.findUniqueOrThrow({ where: { id: messageId } });
+export async function declineCounterOffer(
+  messageId: string,
+  actor: { id: string; role?: Role } | string,
+  reason: string,
+) {
+  const actorId = typeof actor === "string" ? actor : actor.id;
+  const message = await prisma.negotiationMessage.findUniqueOrThrow({
+    where: { id: messageId },
+    include: { quotation: { select: { id: true, ownerId: true } } },
+  });
+
+  assertCanMutateQuotation(actor, message.quotation);
   if (message.status !== "OPEN") throw new DomainError("This request has already been answered.");
 
   return prisma.$transaction(async (tx) => {
     await tx.negotiationMessage.update({ where: { id: messageId }, data: { status: "DECLINED" } });
     await tx.negotiationMessage.create({
-      data: { quotationId: message.quotationId, authorId: actor.id, body: reason, status: "OPEN" },
+      data: { quotationId: message.quotationId, authorId: actorId, body: reason, status: "OPEN" },
     });
     await writeAudit(tx, {
       entityType: "Quotation",
       entityId: message.quotationId,
       action: "COUNTER_OFFER_DECLINED",
-      actorId: actor.id,
+      actorId,
       reason,
       payload: { messageId },
     });
@@ -259,8 +288,14 @@ export async function declineCounterOffer(messageId: string, actor: { id: string
 }
 
 /** Sends a quotation to the customer, making it visible in their portal for the first time. */
-export async function sendToCustomer(quotationId: string, actorId: string) {
+export async function sendToCustomer(
+  quotationId: string,
+  actor: { id: string; role?: Role } | string,
+) {
+  const actorId = typeof actor === "string" ? actor : actor.id;
   const quotation = await prisma.quotation.findUniqueOrThrow({ where: { id: quotationId } });
+  assertCanMutateQuotation(actor, quotation);
+
   if (quotation.status !== "APPROVED" && quotation.status !== "DRAFT") {
     throw new DomainError(`A quotation in ${quotation.status} state cannot be sent.`);
   }

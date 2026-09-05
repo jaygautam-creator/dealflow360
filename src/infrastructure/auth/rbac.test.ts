@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { can, canAll, canAny, permissionsFor, quotationScopeFor, PERMISSIONS as P } from "./rbac";
+import { can, canAll, canAny, canMutateQuotation, permissionsFor, quotationScopeFor, PERMISSIONS as P } from "./rbac";
 
 describe("RBAC — role capabilities", () => {
   it("gives an admin every permission", () => {
@@ -92,5 +92,39 @@ describe("RBAC — quotation scoping", () => {
     const scope = quotationScopeFor("SALES_REP", "u1", null);
     expect(scope).toHaveProperty("kind");
     expect(Object.keys(scope).length).toBeGreaterThan(1);
+  });
+});
+
+describe("RBAC — quotation mutation ownership & authorization", () => {
+  const repQuote = { ownerId: "rep-1" };
+  const repUser = { id: "rep-1", role: "SALES_REP" as const };
+  const otherRepUser = { id: "rep-2", role: "SALES_REP" as const };
+  const managerUser = { id: "mgr-1", role: "SALES_MANAGER" as const };
+  const adminUser = { id: "admin-1", role: "ADMIN" as const };
+  const financeUser = { id: "fin-1", role: "FINANCE" as const };
+  const portalUser = { id: "cust-1", role: "PORTAL" as const };
+
+  it("permits a sales rep to mutate a quotation they own", () => {
+    expect(canMutateQuotation(repUser, repQuote)).toBe(true);
+  });
+
+  it("denies a sales rep from mutating a quotation owned by another rep", () => {
+    expect(canMutateQuotation(otherRepUser, repQuote)).toBe(false);
+  });
+
+  it("permits an elevated sales manager to mutate any quotation", () => {
+    expect(canMutateQuotation(managerUser, repQuote)).toBe(true);
+  });
+
+  it("permits an admin to mutate any quotation", () => {
+    expect(canMutateQuotation(adminUser, repQuote)).toBe(true);
+  });
+
+  it("denies finance from mutating quotations (no quotation update permission)", () => {
+    expect(canMutateQuotation(financeUser, repQuote)).toBe(false);
+  });
+
+  it("denies portal users from mutating internal quotations", () => {
+    expect(canMutateQuotation(portalUser, repQuote)).toBe(false);
   });
 });

@@ -6,7 +6,8 @@ import { routeForApproval, requiresReapproval, type ApprovalRuleInput } from "@/
 import { marginPct, netLineTotal } from "@/domain/upsell/recommend";
 import { applyPct, sumPaise } from "@/domain/shared/money";
 import type { RiskAssessment, RiskLineInput } from "@/domain/risk/types";
-import type { Prisma } from "@/generated/prisma";
+import type { Prisma, Role } from "@/generated/prisma";
+import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
 
 /**
  * Quotation service.
@@ -156,9 +157,16 @@ export interface SubmissionResult {
  */
 export async function submitForApproval(
   quotationId: string,
-  actorId: string,
+  actor: { id: string; role?: Role } | string,
 ): Promise<SubmissionResult> {
+  const actorId = typeof actor === "string" ? actor : actor.id;
   return prisma.$transaction(async (tx) => {
+    const quotation = await tx.quotation.findUniqueOrThrow({
+      where: { id: quotationId },
+      select: { ownerId: true },
+    });
+    assertCanMutateQuotation(actor, quotation);
+
     const recalc = await recalculateQuotation(tx, quotationId);
     const rules = await loadApprovalRules(tx);
     const routing = routeForApproval(recalc.riskScore, rules);

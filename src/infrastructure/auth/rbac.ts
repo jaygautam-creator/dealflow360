@@ -120,3 +120,20 @@ export function quotationScopeFor(
   if (can(role, P.QUOTATION_READ_OWN)) return { kind: "OWN", ownerId: userId };
   return { kind: "NONE" };
 }
+
+/**
+ * Evaluates whether an actor has authority to mutate a quotation.
+ *
+ * Sales reps may only mutate quotations they own. Elevated roles (admin and
+ * sales manager) hold broad quotation management authority. Roles without
+ * quotation update permission (e.g. Finance, Portal) are always denied.
+ */
+export function canMutateQuotation(
+  actor: { id: string; role: Role },
+  quotation: { ownerId: string },
+): boolean {
+  if (!can(actor.role, P.QUOTATION_UPDATE)) return false;
+  if (can(actor.role, P.QUOTATION_READ_ALL)) return true;
+  return quotation.ownerId === actor.id;
+}
+
