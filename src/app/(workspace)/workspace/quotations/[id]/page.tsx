@@ -107,9 +107,25 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
 
   const assessment = (quotation.riskTrace as unknown as RiskAssessment | null) ?? null;
 
+  const negotiations = quotation.negotiations.map((n) => {
+    const line = n.lineId ? quotation.lines.find((l) => l.id === n.lineId) : undefined;
+    return {
+      id: n.id,
+      authorName: n.author.name,
+      authorRole: n.author.role,
+      body: n.body,
+      lineId: n.lineId,
+      lineProductName: line?.product.name ?? null,
+      requestedDiscountPct: n.requestedDiscountPct === null ? null : dbToPct(n.requestedDiscountPct),
+      status: n.status,
+      createdAt: n.createdAt.toISOString(),
+    };
+  });
+
   return (
     <QuotationBuilder
       quotation={view}
+      negotiations={negotiations}
       assessment={assessment}
       initialSuggestions={suggestions}
       products={catalogue.products.map((p) => ({

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt, Send } from "lucide-react";
+import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt, Send, MessageSquare, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -30,9 +30,14 @@ interface ProductOption {
   categoryCeilingPct: number; price: number; kind: string;
   variants: VariantOption[];
 }
+interface Negotiation {
+  id: string; authorName: string; authorRole: string; body: string;
+  lineId: string | null; lineProductName: string | null;
+  requestedDiscountPct: number | null; status: string; createdAt: string;
+}
 
 export function QuotationBuilder({
-  quotation, assessment, initialSuggestions, products, audit, permissions,
+  quotation, negotiations, assessment, initialSuggestions, products, audit, permissions,
 }: {
   quotation: {
     id: string; number: string; status: string; customerName: string; customerTier: string;
@@ -46,6 +51,7 @@ export function QuotationBuilder({
       schedules: { id: string; productName: string; planName: string; interval: string; amountPerPeriod: number; nextBillingDate: string; status: string }[];
     } | null;
   };
+  negotiations: Negotiation[];
   assessment: RiskAssessment | null;
   initialSuggestions: Suggestion[];
   products: ProductOption[];
@@ -62,6 +68,11 @@ export function QuotationBuilder({
   // nothing downstream (pricing, approvals, audit) needs to know a rep hid a card, so it
   // lives only in client state rather than as a database column or an API call.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const categories = useMemo(() => {
+    const names = Array.from(new Set(products.map((p) => p.categoryName)));
+    return names;
+  }, [products]);
+  const [activeCategory, setActiveCategory] = useState(categories[0] ?? "");
   const [newProductId, setNewProductId] = useState(products[0]?.id ?? "");
   const [newVariantId, setNewVariantId] = useState("");
 
@@ -188,43 +199,73 @@ export function QuotationBuilder({
               </div>
 
               {editable ? (
-                <div className="flex flex-wrap items-end gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-                  <Select label="Product" value={newProductId} disabled={working}
-                    onChange={(e) => { setNewProductId(e.target.value); setNewVariantId(""); }}
-                    containerClassName="min-w-[220px] flex-1">
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} — {money(p.price)} ({p.categoryName}, max {p.categoryCeilingPct}%)</option>
+                <div className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Product category">
+                    {categories.map((c) => (
+                      <button key={c} type="button" role="tab" aria-selected={activeCategory === c}
+                        onClick={() => setActiveCategory(c)}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          activeCategory === c
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-200"
+                            : "border-neutral-200 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900"
+                        }`}>
+                        {c}
+                      </button>
                     ))}
-                  </Select>
-                  {/* Only rendered for products that actually have variants, so the common
-                      case stays a two-field form rather than carrying an empty control. */}
-                  {selectedProduct && selectedProduct.variants.length > 0 ? (
-                    <Select label={selectedProduct.variants[0].attribute} value={newVariantId} disabled={working}
-                      onChange={(e) => setNewVariantId(e.target.value)} containerClassName="min-w-[160px]">
-                      <option value="">Standard</option>
-                      {selectedProduct.variants.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.value}{v.extraPrice ? ` (+${money(v.extraPrice)})` : ""}
-                        </option>
-                      ))}
-                    </Select>
-                  ) : null}
-                  <Input label="Qty" type="number" min={1} value={newQty} disabled={working}
-                    onChange={(e) => setNewQty(Number(e.target.value))} containerClassName="w-20" />
-                  <Input label="Discount %" type="number" min={0} max={100} step={0.5} value={newDiscount} disabled={working}
-                    onChange={(e) => setNewDiscount(Number(e.target.value))} containerClassName="w-28" />
-                  <Button loading={working} onClick={() => void call(`/api/quotations/${quotation.id}/lines`, {
-                    method: "POST",
-                    body: JSON.stringify({
-                      productId: newProductId,
-                      variantId: newVariantId || null,
-                      quantity: newQty,
-                      discountPct: newDiscount,
-                    }),
-                  })}><Plus className="size-4" />Add</Button>
-                  <span className="pb-2 text-xs text-neutral-500">
-                    Unit {money(previewPrice)}
-                  </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    {products.filter((p) => p.categoryName === activeCategory).map((p) => (
+                      <button key={p.id} type="button" disabled={working}
+                        onClick={() => { setNewProductId(p.id); setNewVariantId(""); }}
+                        className={`rounded-lg border p-3 text-left transition ${
+                          newProductId === p.id
+                            ? "border-indigo-400 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/40"
+                            : "border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+                        }`}>
+                        <div className="font-medium text-neutral-900 dark:text-neutral-100">{p.name}</div>
+                        <div className="mt-1 flex items-center justify-between text-xs text-neutral-500">
+                          <span className="tabular-nums">{money(p.price)}</span>
+                          <span>max {p.categoryCeilingPct}%</span>
+                        </div>
+                      </button>
+                    ))}
+                    {products.filter((p) => p.categoryName === activeCategory).length === 0 ? (
+                      <p className="col-span-full py-4 text-center text-sm text-neutral-500">No products in this category.</p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-wrap items-end gap-2">
+                    {/* Only rendered for products that actually have variants, so the common
+                        case stays a two-field form rather than carrying an empty control. */}
+                    {selectedProduct && selectedProduct.variants.length > 0 ? (
+                      <Select label={selectedProduct.variants[0].attribute} value={newVariantId} disabled={working}
+                        onChange={(e) => setNewVariantId(e.target.value)} containerClassName="min-w-[160px]">
+                        <option value="">Standard</option>
+                        {selectedProduct.variants.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.value}{v.extraPrice ? ` (+${money(v.extraPrice)})` : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : null}
+                    <Input label="Qty" type="number" min={1} value={newQty} disabled={working}
+                      onChange={(e) => setNewQty(Number(e.target.value))} containerClassName="w-20" />
+                    <Input label="Discount %" type="number" min={0} max={100} step={0.5} value={newDiscount} disabled={working}
+                      onChange={(e) => setNewDiscount(Number(e.target.value))} containerClassName="w-28" />
+                    <Button loading={working} disabled={!selectedProduct} onClick={() => void call(`/api/quotations/${quotation.id}/lines`, {
+                      method: "POST",
+                      body: JSON.stringify({
+                        productId: newProductId,
+                        variantId: newVariantId || null,
+                        quantity: newQty,
+                        discountPct: newDiscount,
+                      }),
+                    })}><Plus className="size-4" />Add</Button>
+                    <span className="pb-2 text-xs text-neutral-500">
+                      {selectedProduct ? `Unit ${money(previewPrice)}` : "Pick a product"}
+                    </span>
+                  </div>
                 </div>
               ) : null}
 
@@ -320,6 +361,21 @@ export function QuotationBuilder({
               </div>
             </CardContent>
           </Card>
+
+          {negotiations.length > 0 ? (
+            <NegotiationPanel
+              negotiations={negotiations}
+              canRespond={permissions.mayEdit}
+              working={working}
+              onRespond={(id, action, reason) =>
+                void call(
+                  `/api/negotiations/${id}`,
+                  { method: "POST", body: JSON.stringify(action === "ACCEPT" ? { action } : { action, reason }) },
+                  action === "ACCEPT" ? "Counter-offer accepted." : "Counter-offer declined.",
+                )
+              }
+            />
+          ) : null}
 
           {editable && suggestions.length > 0 ? (
             <Card>
@@ -426,6 +482,69 @@ function OrderPanel({ order }: { order: NonNullable<Parameters<typeof QuotationB
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function NegotiationPanel({
+  negotiations, canRespond, working, onRespond,
+}: {
+  negotiations: Negotiation[];
+  canRespond: boolean;
+  working: boolean;
+  onRespond: (id: string, action: "ACCEPT" | "DECLINE", reason?: string) => void;
+}) {
+  // Newest first, so the counter-offer the rep actually has to act on is the first
+  // thing they see rather than buried under the history of the conversation.
+  const ordered = [...negotiations].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (
+    <Card>
+      <CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="size-4" />Negotiation</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {ordered.map((n) => {
+          const isCustomer = n.authorRole === "PORTAL";
+          const open = n.status === "OPEN";
+          return (
+            <div key={n.id} className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {n.authorName} <span className="font-normal text-neutral-500">· {isCustomer ? "customer" : n.authorRole.replace("_", " ").toLowerCase()}</span>
+                  </div>
+                  {n.lineProductName ? (
+                    <div className="text-xs text-neutral-500">re: {n.lineProductName}</div>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Badge tone={open ? "warning" : n.status === "ACCEPTED" ? "success" : "neutral"}>{n.status.toLowerCase()}</Badge>
+                  <span className="text-xs text-neutral-400">{new Date(n.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              </div>
+              <p className="mt-1.5 break-words text-sm text-neutral-700 dark:text-neutral-300">{n.body}</p>
+              {n.requestedDiscountPct !== null ? (
+                <div className="mt-2 inline-flex items-baseline gap-1 rounded-md bg-amber-50 px-2 py-1 dark:bg-amber-950/40">
+                  <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Requested discount</span>
+                  <span className="text-lg font-bold tabular-nums text-amber-900 dark:text-amber-200">{n.requestedDiscountPct}%</span>
+                </div>
+              ) : null}
+              {open && isCustomer && canRespond ? (
+                <div className="mt-3 flex gap-2">
+                  <Button size="sm" loading={working} onClick={() => onRespond(n.id, "ACCEPT")}>
+                    <Check className="size-4" />Accept
+                  </Button>
+                  <Button size="sm" variant="danger" loading={working} onClick={() => {
+                    const reason = window.prompt("Reason for declining this counter-offer?");
+                    if (reason === null) return;
+                    onRespond(n.id, "DECLINE", reason || undefined);
+                  }}>
+                    <X className="size-4" />Decline
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 
