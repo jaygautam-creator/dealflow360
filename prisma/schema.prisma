@@ -586,8 +586,13 @@ model Invoice {
   type   InvoiceType
   status InvoiceStatus @default(DRAFT)
 
+  // Restrict, not Cascade: a payment, credit note or invoice is evidence that money
+  // moved. It must not disappear as a side effect of removing a parent row — deleting
+  // financial history should require deleting the financial record, deliberately and on
+  // its own. prisma/seed.ts already removes these in dependency order, so reseeding is
+  // unaffected.
   salesOrderId String
-  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Restrict)
 
   amount Decimal @db.Decimal(14, 2)
 
@@ -611,7 +616,7 @@ model Invoice {
 model Payment {
   id        String   @id @default(cuid())
   invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   amount    Decimal  @db.Decimal(14, 2)
   method    String   @default("BANK")
   paidAt    DateTime @default(now())
@@ -623,7 +628,7 @@ model CreditNote {
   id        String   @id @default(cuid())
   number    String   @unique
   invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   amount    Decimal  @db.Decimal(14, 2)
   reason    String
   createdAt DateTime @default(now())
