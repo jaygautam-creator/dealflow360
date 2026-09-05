@@ -1,0 +1,644 @@
+// DealFlow360 — data model
+// Design rules held throughout this schema:
+//  1. Money and percentages are Decimal, never Float. Float rounding is unacceptable
+//     in a system that computes discounts, margins and invoices.
+//  2. Every governance tunable (risk amplifier, approval bands, stall window) lives in a
+//     table, not in code. The rules are configuration, so a reviewer can change them live.
+//  3. State transitions are never silently overwritten — AuditEvent records who/what/when/why.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity & access
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  SALES_REP
+  SALES_MANAGER
+  FINANCE
+  PORTAL // customer-side user: sees only their own quotations
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String
+  role         Role
+  isActive     Boolean @default(true)
+
+  // Populated only for PORTAL users. This is the tenancy boundary that scopes
+  // every portal query to a single customer.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  ownedQuotations Quotation[]      @relation("QuotationOwner")
+  approvals       ApprovalStep[]
+  auditEvents     AuditEvent[]
+  negotiations    NegotiationMessage[]
+
+  createdAt DateTime @default(now())
+
+  @@index([role])
+  @@index([customerId])
+}
+
+enum CustomerTier {
+  BRONZE
+  SILVER
+  GOLD
+}
+
+model Customer {
+  id       String       @id @default(cuid())
+  name     String
+  email    String
+  tier     CustomerTier @default(BRONZE)
+  currency String       @default("INR")
+  city     String?
+  country  String?
+
+  users      User[]
+  quotations Quotation[]
+
+  createdAt DateTime @default(now())
+
+  @@index([tier])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catalogue
+// ─────────────────────────────────────────────────────────────
+
+model ProductCategory {
+  id   String @id @default(cuid())
+  name String @unique
+
+  // Category-level discount ceiling. Thin-margin categories (Services) sit lower than
+  // the customer's tier ceiling, which is what makes the risk score "blended".
+  maxDiscountPct Decimal @db.Decimal(5, 2)
+
+  products Product[]
+}
+
+enum ProductKind {
+  ONE_TIME
+  SUBSCRIPTION
+  SERVICE
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  sku         String      @unique
+  name        String
+  description String?
+  kind        ProductKind @default(ONE_TIME)
+
+  categoryId String
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+
+  listPrice Decimal @db.Decimal(14, 2)
+  cost      Decimal @db.Decimal(14, 2) // drives live margin, never shown to portal users
+  taxPct    Decimal @default(18) @db.Decimal(5, 2)
+  uom       String  @default("Unit")
+
+  // Ranks higher in upsell suggestions while a promotion is running.
+  isPromoted Boolean @default(false)
+
+  defaultPlanId String?
+  defaultPlan   SubscriptionPlan? @relation(fields: [defaultPlanId], references: [id])
+
+  variants        ProductVariant[]
+  priceListItems  PriceListItem[]
+  stockLevels     StockLevel[]
+  quotationLines  QuotationLine[]
+  upsellTriggers  UpsellRule[]     @relation("TriggerProduct")
+  upsellSuggests  UpsellRule[]     @relation("SuggestedProduct")
+  allocations     FulfillmentAllocation[]
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([categoryId])
+  @@index([kind])
+}
+
+model ProductVariant {
+  id         String  @id @default(cuid())
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attribute  String // e.g. "Size"
+  value      String // e.g. "Large"
+  extraPrice Decimal @default(0) @db.Decimal(14, 2)
+
+  quotationLines QuotationLine[]
+
+  @@unique([productId, attribute, value])
+}
+
+model PriceList {
+  id       String        @id @default(cuid())
+  name     String
+  tier     CustomerTier?  // null = default list, applied when no tier list matches
+  currency String        @default("INR")
+  items    PriceListItem[]
+
+  @@unique([tier, currency])
+}
+
+model PriceListItem {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price       Decimal   @db.Decimal(14, 2)
+
+  @@unique([priceListId, productId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Discount governance (configuration, not code)
+// ─────────────────────────────────────────────────────────────
+
+model TierDiscountCeiling {
+  id             String       @id @default(cuid())
+  tier           CustomerTier @unique
+  maxDiscountPct Decimal      @db.Decimal(5, 2)
+}
+
+enum ApprovalLevel {
+  SALES_MANAGER
+  FINANCE
+}
+
+// The approval chain, expressed as score bands. Editable at runtime from the admin
+// screen — changing a row here re-routes the very next quotation, with no redeploy.
+model ApprovalRule {
+  id       String  @id @default(cuid())
+  name     String
+  minScore Decimal @db.Decimal(6, 2) // inclusive
+  maxScore Decimal? @db.Decimal(6, 2) // exclusive; null = unbounded
+  requiresManager Boolean @default(false)
+  requiresFinance Boolean @default(false)
+  sequence Int     @default(0)
+
+  @@index([sequence])
+}
+
+// Singleton row holding the tunables the risk and health engines read at runtime.
+model RiskConfig {
+  id String @id @default("singleton")
+
+  // Multiplier applied to the value-weighted aggregate breach signal. Raising it makes
+  // "many small over-discounts" escalate sooner relative to "one bad line".
+  aggregateAmplifier Decimal @default(1.5) @db.Decimal(5, 2)
+
+  // A quotation with no activity for this many days is reported as stalled.
+  stalledAfterDays Int @default(5)
+
+  // Discount anomaly threshold, in standard deviations above the rep's own rolling mean.
+  anomalyZThreshold Decimal @default(2.0) @db.Decimal(5, 2)
+
+  // Minimum quotation history a rep needs before anomaly detection is meaningful.
+  anomalyMinSamples Int @default(3)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// Inventory
+// ─────────────────────────────────────────────────────────────
+
+model Warehouse {
+  id   String @id @default(cuid())
+  code String @unique
+  name String
+
+  // Relative cost of shipping from this warehouse. The fulfilment planner uses it to
+  // break ties between warehouses that can cover the same demand.
+  shippingCostWeight Decimal @default(1) @db.Decimal(8, 2)
+
+  stockLevels StockLevel[]
+  allocations FulfillmentAllocation[]
+
+  isActive Boolean @default(true)
+}
+
+model StockLevel {
+  id          String    @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity      Int @default(0)
+  reorderPoint  Int @default(0)
+
+  @@unique([warehouseId, productId])
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Subscriptions
+// ─────────────────────────────────────────────────────────────
+
+enum BillingInterval {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model SubscriptionPlan {
+  id       String          @id @default(cuid())
+  name     String
+  interval BillingInterval
+
+  // When a subscription starts or changes mid-period, charge only the unused remainder.
+  prorateOnChange Boolean @default(true)
+  // Percentage of the unused remainder returned as a credit note on cancellation.
+  refundPctOnCancel Decimal @default(100) @db.Decimal(5, 2)
+
+  products       Product[]
+  quotationLines QuotationLine[]
+  schedules      BillingSchedule[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Upsell / cross-sell
+// ─────────────────────────────────────────────────────────────
+
+model UpsellRule {
+  id String @id @default(cuid())
+
+  triggerProductId String
+  triggerProduct   Product @relation("TriggerProduct", fields: [triggerProductId], references: [id], onDelete: Cascade)
+
+  suggestedProductId String
+  suggestedProduct   Product @relation("SuggestedProduct", fields: [suggestedProductId], references: [id], onDelete: Cascade)
+
+  // How often these two were bought together historically. Drives ranking.
+  coPurchaseScore Decimal @default(0) @db.Decimal(5, 2)
+  // Suggestion is suppressed if adding it would drop the line margin below this.
+  minMarginPct    Decimal @default(0) @db.Decimal(5, 2)
+
+  @@unique([triggerProductId, suggestedProductId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Quotation → Order → Fulfilment → Billing
+// ─────────────────────────────────────────────────────────────
+
+enum QuotationStatus {
+  DRAFT
+  PENDING_MANAGER
+  PENDING_FINANCE
+  APPROVED
+  REJECTED
+  SENT
+  UNDER_NEGOTIATION
+  CONFIRMED
+  CANCELLED
+}
+
+enum LineType {
+  ONE_TIME
+  RECURRING
+}
+
+model Quotation {
+  id     String          @id @default(cuid())
+  number String          @unique
+  status QuotationStatus @default(DRAFT)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  ownerId String
+  owner   User   @relation("QuotationOwner", fields: [ownerId], references: [id])
+
+  // Snapshot of the last risk evaluation. The full explainable breakdown is kept in
+  // riskTrace so the approval screen can show *why*, not just the number.
+  riskScore Decimal @default(0) @db.Decimal(6, 2)
+  riskTrace Json?
+
+  subtotal      Decimal @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal @default(0) @db.Decimal(14, 2)
+  taxTotal      Decimal @default(0) @db.Decimal(14, 2)
+  total         Decimal @default(0) @db.Decimal(14, 2)
+  marginPct     Decimal @default(0) @db.Decimal(6, 2)
+
+  // Drives stalled-deal detection; touched on every meaningful change.
+  lastActivityAt DateTime @default(now())
+  promisedDate   DateTime?
+  validUntil     DateTime?
+
+  lines         QuotationLine[]
+  approvalSteps ApprovalStep[]
+  negotiations  NegotiationMessage[]
+  salesOrder    SalesOrder?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([ownerId])
+  @@index([customerId])
+  @@index([lastActivityAt])
+}
+
+model QuotationLine {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  quantity    Int
+  // Price resolved from the customer's tier price list at the moment of adding, so a
+  // later price-list edit cannot silently rewrite an existing quotation.
+  unitPrice   Decimal @db.Decimal(14, 2)
+  unitCost    Decimal @db.Decimal(14, 2)
+  discountPct Decimal @default(0) @db.Decimal(5, 2)
+  taxPct      Decimal @default(18) @db.Decimal(5, 2)
+
+  lineType LineType @default(ONE_TIME)
+
+  planId String?
+  plan   SubscriptionPlan? @relation(fields: [planId], references: [id])
+
+  // True when the rep accepted an upsell suggestion — lets the dashboard measure
+  // how much revenue the recommendation engine actually produced.
+  fromUpsell Boolean @default(false)
+
+  sequence Int @default(0)
+
+  allocations FulfillmentAllocation[]
+  schedules   BillingSchedule[]
+
+  @@index([quotationId])
+  @@index([productId])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+  SKIPPED
+}
+
+model ApprovalStep {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  level    ApprovalLevel
+  sequence Int
+  status   ApprovalStatus @default(PENDING)
+
+  approverId String?
+  approver   User?   @relation(fields: [approverId], references: [id])
+  decidedAt  DateTime?
+  reason     String?
+
+  // The score that triggered this step, kept so history stays truthful even after
+  // the quotation is edited and re-scored.
+  triggeredByScore Decimal @db.Decimal(6, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([quotationId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Customer portal negotiation
+// ─────────────────────────────────────────────────────────────
+
+enum NegotiationStatus {
+  OPEN
+  ACCEPTED
+  DECLINED
+}
+
+model NegotiationMessage {
+  id          String    @id @default(cuid())
+  quotationId String
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  // Null for an order-level message; set when the customer questions one line.
+  lineId String?
+
+  body String
+
+  // Set when the customer counters on price. Accepting it rewrites the line discount
+  // and forces re-scoring, which is what can push the quote back into approval.
+  requestedDiscountPct Decimal? @db.Decimal(5, 2)
+
+  status NegotiationStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+
+  @@index([quotationId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Order, fulfilment, billing
+// ─────────────────────────────────────────────────────────────
+
+enum OrderStatus {
+  CONFIRMED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+model SalesOrder {
+  id     String      @id @default(cuid())
+  number String      @unique
+  status OrderStatus @default(CONFIRMED)
+
+  quotationId String    @unique
+  quotation   Quotation @relation(fields: [quotationId], references: [id])
+
+  confirmedAt DateTime @default(now())
+
+  fulfillmentPlan FulfillmentPlan?
+  invoices        Invoice[]
+  schedules       BillingSchedule[]
+}
+
+model FulfillmentPlan {
+  id           String     @id @default(cuid())
+  salesOrderId String     @unique
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  shipmentCount     Int
+  totalShippingCost Decimal @db.Decimal(14, 2)
+
+  // True when a human rejected the suggested split. Kept so the dashboard can report
+  // how often the planner is overridden.
+  isManualOverride Boolean @default(false)
+  // Machine-readable record of how the planner reached this split.
+  planTrace Json?
+
+  allocations FulfillmentAllocation[]
+
+  createdAt DateTime @default(now())
+}
+
+model FulfillmentAllocation {
+  id     String          @id @default(cuid())
+  planId String
+  plan   FulfillmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  lineId String
+  line   QuotationLine @relation(fields: [lineId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  // Null when the quantity could not be sourced anywhere and became a backorder.
+  warehouseId String?
+  warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  quantity     Int
+  isBackorder  Boolean @default(false)
+
+  @@index([planId])
+}
+
+enum InvoiceType {
+  ONE_TIME
+  RECURRING
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  CREDITED
+}
+
+model Invoice {
+  id     String        @id @default(cuid())
+  number String        @unique
+  type   InvoiceType
+  status InvoiceStatus @default(DRAFT)
+
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(14, 2)
+
+  // Present on recurring invoices: the service window this invoice covers.
+  periodStart DateTime?
+  periodEnd   DateTime?
+  // True when the amount was reduced because the window was shorter than a full period.
+  isProrated  Boolean @default(false)
+
+  dueDate DateTime?
+
+  payments    Payment[]
+  creditNotes CreditNote[]
+
+  createdAt DateTime @default(now())
+
+  @@index([salesOrderId])
+  @@index([status])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(14, 2)
+  method    String   @default("BANK")
+  paidAt    DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+model CreditNote {
+  id        String   @id @default(cuid())
+  number    String   @unique
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(14, 2)
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+}
+
+enum ScheduleStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+// One row per recurring line: the forward billing calendar for that subscription.
+model BillingSchedule {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  lineId String
+  line   QuotationLine @relation(fields: [lineId], references: [id])
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  interval        BillingInterval
+  amountPerPeriod Decimal  @db.Decimal(14, 2)
+  nextBillingDate DateTime
+  periodsBilled   Int      @default(0)
+  status          ScheduleStatus @default(ACTIVE)
+
+  cancelledAt DateTime?
+
+  @@index([salesOrderId])
+  @@index([nextBillingDate])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audit
+// ─────────────────────────────────────────────────────────────
+
+// Append-only. Nothing in the application updates or deletes these rows: every
+// approval, rejection, edit and negotiation leaves a permanent record of who did
+// what, when, and why.
+model AuditEvent {
+  id String @id @default(cuid())
+
+  entityType String // "Quotation", "ApprovalStep", ...
+  entityId   String
+  action     String // "QUOTATION_SUBMITTED", "DISCOUNT_CHANGED", ...
+
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  reason  String?
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
