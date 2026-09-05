@@ -27,12 +27,12 @@ async function checkPermission(allowed: (role: Parameters<typeof can>[0]) => boo
   }
 }
 
-/** Products, categories, price lists, warehouses, risk config, subscription plans, upsell rules. */
+/** Products, categories, price lists, warehouses, subscription plans, upsell rules. */
 export function guardConfigManage(): Promise<GuardResult> {
   return checkPermission((role) => can(role, P.CONFIG_MANAGE));
 }
 
-/** Approval rules and tier ceilings: a sales manager owns these without full CONFIG_MANAGE. */
+/** Approval rules, tier ceilings, and risk config: a sales manager owns these without full CONFIG_MANAGE. */
 export function guardConfigWrite(): Promise<GuardResult> {
   return checkPermission((role) => canAny(role, [P.CONFIG_MANAGE, P.CONFIG_APPROVAL_CHAIN]));
 }
