@@ -188,7 +188,23 @@ async function main() {
       { triggerProductId: laptop.id, suggestedProductId: supportPlan.id, coPurchaseScore: 72, minMarginPct: 30 },
       { triggerProductId: server.id, suggestedProductId: setup.id, coPurchaseScore: 64, minMarginPct: 25 },
       { triggerProductId: server.id, suggestedProductId: backup.id, coPurchaseScore: 58, minMarginPct: 40 },
+      // Deliberately below Data Migration's 25.7% margin floor, so this rule exists but is
+      // suppressed. The margin threshold is a real filter, and a demo that never shows it
+      // working cannot prove it does.
       { triggerProductId: laptop.id, suggestedProductId: migration.id, coPurchaseScore: 41, minMarginPct: 30 },
+
+      // Every product must trigger at least one suggestion. With rules hanging off only
+      // the laptop and the server, a rep who started a quote with anything else saw an
+      // empty panel and reasonably concluded the recommender was broken. Co-purchase
+      // scores are ordered to keep the ranking legible rather than arbitrary.
+      { triggerProductId: dock.id, suggestedProductId: supportPlan.id, coPurchaseScore: 68, minMarginPct: 30 },
+      { triggerProductId: dock.id, suggestedProductId: laptop.id, coPurchaseScore: 55, minMarginPct: 25 },
+      { triggerProductId: setup.id, suggestedProductId: supportPlan.id, coPurchaseScore: 74, minMarginPct: 30 },
+      { triggerProductId: setup.id, suggestedProductId: migration.id, coPurchaseScore: 62, minMarginPct: 20 },
+      { triggerProductId: migration.id, suggestedProductId: backup.id, coPurchaseScore: 70, minMarginPct: 40 },
+      { triggerProductId: supportPlan.id, suggestedProductId: backup.id, coPurchaseScore: 66, minMarginPct: 40 },
+      { triggerProductId: backup.id, suggestedProductId: supportPlan.id, coPurchaseScore: 63, minMarginPct: 30 },
+      { triggerProductId: server.id, suggestedProductId: supportPlan.id, coPurchaseScore: 59, minMarginPct: 30 },
     ],
   });
 
