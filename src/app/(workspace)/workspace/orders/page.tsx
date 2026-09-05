@@ -3,12 +3,13 @@ import { requirePermissionPage } from "@/infrastructure/auth/guards";
 import { PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { scopedQuotationWhere } from "@/application/queries";
 import { prisma } from "@/infrastructure/db";
-import { dbToPaise } from "@/infrastructure/money";
+import { dbToPaise, dbToPct } from "@/infrastructure/money";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
+import { findConsolidationOpportunity } from "@/domain/fulfillment/planner";
 import type { OrderStatus } from "@/generated/prisma";
 
 export const metadata = { title: "Orders" };
@@ -22,14 +23,38 @@ export const dynamic = "force-dynamic";
 export default async function OrdersPage() {
   const user = await requirePermissionPage(P.FULFILLMENT_VIEW, "/workspace/orders");
 
-  const orders = await prisma.salesOrder.findMany({
-    where: { quotation: scopedQuotationWhere(user) },
-    include: {
-      quotation: { select: { id: true, number: true, total: true, customer: { select: { name: true } } } },
-      fulfillmentPlan: { select: { shipmentCount: true, allocations: { select: { isBackorder: true } } } },
-    },
-    orderBy: { confirmedAt: "desc" },
-  });
+  const [orders, warehouses] = await Promise.all([
+    prisma.salesOrder.findMany({
+      where: { quotation: scopedQuotationWhere(user) },
+      include: {
+        quotation: { select: { id: true, number: true, total: true, customer: { select: { name: true } } } },
+        fulfillmentPlan: {
+          select: {
+            shipmentCount: true,
+            allocations: {
+              select: { lineId: true, productId: true, quantity: true, isBackorder: true, product: { select: { name: true } } },
+            },
+          },
+        },
+      },
+      orderBy: { confirmedAt: "desc" },
+    }),
+    prisma.warehouse.findMany({
+      where: { isActive: true },
+      include: { stockLevels: { select: { productId: true, quantity: true } } },
+    }),
+  ]);
+
+  // Read-only detection: if delayed stock now lets one warehouse cover every backorder
+  // on an order, surface it — the spec asks for the prompt, not for the write that acts
+  // on it yet (spec B6).
+  const warehouseStock = warehouses.map((w) => ({
+    warehouseId: w.id,
+    warehouseCode: w.code,
+    warehouseName: w.name,
+    shippingCostWeight: dbToPct(w.shippingCostWeight),
+    available: Object.fromEntries(w.stockLevels.map((s) => [s.productId, s.quantity])),
+  }));
 
   return (
     <div className="space-y-6">
@@ -53,7 +78,22 @@ export default async function OrdersPage() {
               </THead>
               <TBody>
                 {orders.map((order) => {
-                  const hasBackorder = order.fulfillmentPlan?.allocations.some((a) => a.isBackorder) ?? false;
+                  const rawAllocations = order.fulfillmentPlan?.allocations ?? [];
+                  const hasBackorder = rawAllocations.some((a) => a.isBackorder);
+                  const consolidation = hasBackorder
+                    ? findConsolidationOpportunity(
+                        rawAllocations.map((a) => ({
+                          lineId: a.lineId,
+                          productId: a.productId,
+                          productName: a.product.name,
+                          warehouseId: null,
+                          warehouseName: null,
+                          quantity: a.quantity,
+                          isBackorder: a.isBackorder,
+                        })),
+                        warehouseStock,
+                      )
+                    : null;
                   return (
                     <TR key={order.id}>
                       <TD>
@@ -75,7 +115,14 @@ export default async function OrdersPage() {
                       </TD>
                       <TD>
                         {hasBackorder ? (
-                          <Badge tone="danger">Backorder</Badge>
+                          <div className="space-y-1">
+                            <Badge tone="danger">Backorder</Badge>
+                            {consolidation && (
+                              <p className="text-xs font-medium text-indigo-600" title={`${consolidation.warehouseName} can now cover every backordered line on this order.`}>
+                                Consolidate Remaining Backorder — {consolidation.warehouseName}
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-neutral-300">—</span>
                         )}

@@ -87,7 +87,7 @@ echo "Navigation reachability — every link in the shell must resolve"
 echo "-------------------------------------------"
 # A 404 behind a nav item is the first thing a reviewer finds, and it reads as
 # unfinished work regardless of what is behind the other links.
-for route in /workspace /workspace/quotations /workspace/approvals /workspace/health /workspace/orders /workspace/orders/subscriptions; do
+for route in /workspace /workspace/quotations /workspace/approvals /workspace/health /workspace/orders /workspace/orders/subscriptions /workspace/reports; do
   check "$(status mgr "$route")" "200" "Manager can open $route"
 done
 check "$(status rep /workspace/quotations/new)" "200" "Rep can open the new-quotation form"
