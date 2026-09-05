@@ -54,6 +54,15 @@ export function PortalQuotation({
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Could not send your message."); return; }
+      // The server may accept the message and still refuse the discount it asked for.
+      // Show that reason and keep the figure in the box so it can be corrected, rather
+      // than clearing the form and leaving the customer to guess what happened.
+      if (data.declined) {
+        setError(data.reason ?? "That discount is beyond what can be requested.");
+        setBody("");
+        startTransition(() => router.refresh());
+        return;
+      }
       setBody(""); setCounter(""); setLineId(null);
       startTransition(() => router.refresh());
     } catch {

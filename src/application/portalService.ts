@@ -4,6 +4,10 @@ import { dbToPct } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
 import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
+import {
+  MAX_REQUESTABLE_DISCOUNT_PCT,
+  screenCounterOffer,
+} from "@/domain/negotiation/counterOffer";
 import type { Role } from "@/generated/prisma";
 import type { SessionUser } from "@/infrastructure/auth/session";
 
@@ -151,17 +155,50 @@ export async function postNegotiation(
     }
   }
 
+  // An ask beyond the cap is refused by the system, not by a person. It is still recorded
+  // — auto-declining in the open is governance you can see, where a silent 400 would leave
+  // the rep unaware the customer ever asked and the customer unsure the message landed.
+  const verdict =
+    input.requestedDiscountPct != null
+      ? screenCounterOffer(input.requestedDiscountPct)
+      : ({ admissible: true } as const);
+
   return prisma.$transaction(async (tx) => {
-    await tx.negotiationMessage.create({
+    const message = await tx.negotiationMessage.create({
       data: {
         quotationId,
         authorId: user.id,
         lineId: input.lineId ?? null,
         body: input.body,
         requestedDiscountPct: input.requestedDiscountPct ?? null,
-        status: "OPEN",
+        status: verdict.admissible ? "OPEN" : "DECLINED",
       },
     });
+
+    if (!verdict.admissible) {
+      await writeAudit(tx, {
+        entityType: "Quotation",
+        entityId: quotationId,
+        action: "COUNTER_OFFER_AUTO_DECLINED",
+        actorId: user.id,
+        reason: verdict.reason,
+        payload: {
+          messageId: message.id,
+          lineId: input.lineId ?? null,
+          requestedDiscountPct: input.requestedDiscountPct ?? null,
+          capPct: MAX_REQUESTABLE_DISCOUNT_PCT,
+        },
+      });
+
+      // The quotation's status is deliberately left alone. A refused ask is not a
+      // negotiation, and moving the deal to UNDER_NEGOTIATION would put work on a rep's
+      // board that the system has already closed.
+      return {
+        status: quotation.status,
+        declined: true as const,
+        reason: verdict.reason,
+      };
+    }
 
     // Moving into UNDER_NEGOTIATION is what surfaces the deal on the rep's board, and
     // touching lastActivityAt keeps it out of the stalled report.
@@ -181,7 +218,7 @@ export async function postNegotiation(
       payload: { lineId: input.lineId ?? null, requestedDiscountPct: input.requestedDiscountPct ?? null },
     });
 
-    return { status: "UNDER_NEGOTIATION" };
+    return { status: "UNDER_NEGOTIATION", declined: false as const, reason: null };
   });
 }
 
