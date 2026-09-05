@@ -6,7 +6,7 @@ export default defineConfig({
     // Only the domain layer is unit-tested. It is pure by construction — no database,
     // no network, no framework — so these tests run in milliseconds and prove the
     // business rules directly rather than through the UI.
-    include: ["src/domain/**/*.test.ts"],
+    include: ["src/domain/**/*.test.ts", "src/infrastructure/**/*.test.ts"],
     environment: "node",
   },
   resolve: {
