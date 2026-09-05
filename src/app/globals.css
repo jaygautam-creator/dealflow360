@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
+/*
+ * DealFlow360 is a light-only interface, deliberately.
+ *
+ * This is an operations tool: people read dense tables of money and percentages in it for
+ * hours, often in a bright office. A light surface with high-contrast text is the right
+ * call for that, and committing to one theme means every colour can be tuned properly
+ * rather than compromised across two.
+ *
+ * The `dark:` variant is redefined below to key off a `.dark` ancestor class that is never
+ * applied, instead of the OS preference. Without this, Tailwind's default would flip the
+ * whole app dark on any machine set to dark mode — a theme nobody designed or reviewed.
+ * The existing dark: utilities stay harmlessly inert, and adding the class to <html> is
+ * all it would take to bring a dark theme back later.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* A warm near-white ground rather than pure #fff: less glare over a long session,
+     and it lets a genuinely white card sit above it as a distinct surface. */
+  --color-canvas: #fafaf9;
+  --color-surface: #ffffff;
+  --color-hairline: #e7e5e4;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background-color: var(--color-canvas);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-canvas);
+  color: #1c1917;
+  font-family: var(--font-sans);
+  /* Slightly tighter than default: this UI is dense, and the extra line height reads as
+     sloppiness in a table of figures. */
+  line-height: 1.5;
+}
+
+/* Figures line up in columns. Without this, a table of totals looks ragged and is
+   noticeably harder to scan for the outlier — which is the whole point of the dashboard. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A visible, consistent focus ring everywhere. Keyboard users should never have to guess
+   where they are, and the browser default disappears against our accent colour. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect a reader who has asked for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -1,4 +1,4 @@
-import { addMonths, addYears, differenceInCalendarDays } from "date-fns";
+import { addMonths, addYears, differenceInCalendarDays } from "../shared/dates";
 import { roundPaise, safeRatio, sumPaise } from "../shared/money";
 import type {
   BillingInterval,

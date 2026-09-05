@@ -48,6 +48,17 @@ post() { curl -s -b "$JAR/$1" -X POST "$BASE$2" -H 'Content-Type: application/js
 get()  { curl -s -b "$JAR/$1" "$BASE$2"; }
 
 echo
+b "Warming routes"
+# The dev server compiles each route on its first request. A cold compile can take
+# seconds, which makes the first assertion against a given route look like a failure
+# when it is really a build. Every route the script touches is hit once here, before
+# anything is asserted, so a timing artefact cannot be mistaken for a defect.
+for route in /login /workspace /portal /admin; do
+  curl -s -o /dev/null "$BASE$route" || true
+done
+dim "routes compiled"
+
+echo
 b "Resolving seed data"
 IDS=$(npx --yes tsx scripts/_ids.ts 2>/dev/null | tail -1)
 ACME=$(jq -r .acme <<<"$IDS"); LAPTOP=$(jq -r .laptop <<<"$IDS")

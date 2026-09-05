@@ -1,4 +1,4 @@
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays } from "../shared/dates";
 
 /**
  * Deal health and anomaly detection

@@ -7,6 +7,7 @@ import { splitBilling } from "@/domain/billing/billing";
 import type { OneTimeLineInput, RecurringLineInput } from "@/domain/billing/types";
 import { netLineTotal } from "@/domain/upsell/recommend";
 import { applyPct } from "@/domain/shared/money";
+import { addDays } from "@/domain/shared/dates";
 import { writeAudit } from "./quotationService";
 import { DomainError } from "@/app/api/_lib/respond";
 import type { Prisma } from "@/generated/prisma";
@@ -295,10 +296,4 @@ async function nextNumber(tx: Prisma.TransactionClient, prefix: "SO" | "INV" | "
         ? await tx.invoice.count()
         : await tx.creditNote.count();
   return `${prefix}-${year}-${String(count + 1).padStart(4, "0")}`;
-}
-
-function addDays(from: Date, days: number): Date {
-  const d = new Date(from);
-  d.setDate(d.getDate() + days);
-  return d;
 }
