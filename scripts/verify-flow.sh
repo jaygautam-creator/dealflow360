@@ -20,6 +20,7 @@ ok()  { printf '\033[32m    PASS\033[0m  %s\n' "$1"; PASS=$((PASS+1)); }
 no()  { printf '\033[31m    FAIL\033[0m  %s\n' "$1"; FAIL=$((FAIL+1)); }
 check(){ if [ "$1" = "$2" ]; then ok "$3"; else no "$3 (expected '$2', got '$1')"; fi; }
 gt()   { if awk "BEGIN{exit !($1 > $2)}"; then ok "$3"; else no "$3 (got '$1', wanted > $2)"; fi; }
+seen() { if grep -q "$2" <<<"$1"; then echo yes; else echo no; fi; }
 
 login() { curl -s -c "$JAR/$2" -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
   -d "{\"email\":\"$1\",\"password\":\"demo1234\"}" > /dev/null; }
@@ -118,6 +119,45 @@ echo
 b "11. A confirmed quotation is immutable"
 R=$(post rep "/api/quotations/$QID/confirm")
 check "$(jq -r .error <<<"$R" | grep -c 'already been confirmed')" "1" "Double confirmation is refused"
+
+echo
+b "12. Customer portal — a clean quote goes out and comes back changed"
+QID2=$(post rep /api/quotations "{\"customerId\":\"$ACME\"}" | jq -r .id)
+R=$(post rep "/api/quotations/$QID2/lines" "{\"productId\":\"$LAPTOP\",\"quantity\":10,\"discountPct\":5}")
+check "$(jq -r .recalc.riskScore <<<"$R")" "0" "A 5% discount on a Gold customer needs no approval"
+R=$(post rep "/api/quotations/$QID2/submit")
+check "$(jq -r .status <<<"$R")" "APPROVED" "Auto-approved without a human touching it"
+R=$(post rep "/api/quotations/$QID2/send")
+check "$(jq -r .status <<<"$R")" "SENT" "Published to the customer portal"
+
+login buyer@acme.test buyer
+PORTAL=$(get buyer /portal)
+check "$(grep -c 'Awaiting your review' <<<"$PORTAL")" "1" "The customer sees it waiting for review"
+
+echo
+b "13. The portal must not leak internal figures"
+PQ=$(get buyer "/portal/quotations/$QID2")
+check "$(seen "$PQ" 'Discount risk')" "no" "Risk scoring is invisible to the customer"
+check "$(seen "$PQ" 'drove the score')" "no" "The decision trace is invisible to the customer"
+check "$(seen "$PQ" 'Margin')" "no" "Margin is never sent to the customer"
+check "$(seen "$PQ" 'Audit trail')" "no" "The internal audit trail is invisible to the customer"
+
+echo
+b "14. Customer counters above the ceiling; the rep accepts"
+R=$(post buyer "/api/portal/quotations/$QID2/messages" \
+  '{"body":"We need a better price to proceed this quarter.","requestedDiscountPct":20}')
+check "$(jq -r .status <<<"$R")" "UNDER_NEGOTIATION" "The counter-offer moves the deal into negotiation"
+
+MSG=$(npx --yes tsx scripts/_ids.ts "$QID2" 2>/dev/null | tail -1 | jq -r .messageId)
+R=$(post rep "/api/negotiations/$MSG" '{"action":"ACCEPT"}')
+dim "$(jq -r .reason <<<"$R")"
+check "$(jq -r .riskScore <<<"$R")" "7.5" "20% against a 15% ceiling re-scores to 7.5 points over"
+check "$(jq -r .reapprovalRequired <<<"$R")" "true" "Accepting the counter forces the quote back into approval"
+
+echo
+b "15. The re-opened quotation cannot be confirmed until it is approved again"
+R=$(post rep "/api/quotations/$QID2/confirm")
+check "$(jq -r .error <<<"$R" | grep -c 'cannot be confirmed')" "1" "Confirmation is blocked on the re-opened quotation"
 
 echo
 echo "-------------------------------------------"
