@@ -33,6 +33,19 @@ function parse(formData: FormData) {
   });
 }
 
+/**
+ * Customer.email is unique at the database level. Without this the constraint surfaces as
+ * an unhandled Prisma P2002 and the admin sees a server error rather than the one sentence
+ * that tells them what to do — a constraint that crashes is worse than no constraint.
+ */
+async function emailTaken(email: string, exceptId?: string): Promise<boolean> {
+  const existing = await prisma.customer.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  return existing !== null && existing.id !== exceptId;
+}
+
 export async function createCustomer(formData: FormData) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
@@ -43,6 +56,10 @@ export async function createCustomer(formData: FormData) {
   // Session re-read to get the actor ID for the audit record. guardConfigManage
   // already verified auth — this second call is cheap (JWT verify, no DB round-trip).
   const actor = await requireUserApi();
+
+  if (await emailTaken(parsed.data.email)) {
+    return { error: `A customer with the email ${parsed.data.email} already exists.` };
+  }
 
   await prisma.$transaction(async (tx) => {
     const customer = await tx.customer.create({
@@ -77,6 +94,10 @@ export async function updateCustomer(id: string, formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const actor = await requireUserApi();
+
+  if (await emailTaken(parsed.data.email, id)) {
+    return { error: `Another customer already uses the email ${parsed.data.email}.` };
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.customer.update({

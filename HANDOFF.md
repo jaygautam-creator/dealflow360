@@ -136,27 +136,31 @@ All items previously on this list — product variants in the quotation builder,
 
 ## Known Limitations
 
-- **`Customer.email` is not `@unique`.** Customers are admin-created, never self-registered,
-  so duplicates are not a live risk. It should be unique; it is a one-line migration on a
-  populated table, and that class of migration can fail mid-apply on existing duplicate
-  data — which is why it was not run hours before judging, while the additive
-  `MonthEndPromotion` table was.
-- **`PROMOTION_BOOST = 1.25` is a constant** in `src/domain/upsell/recommend.ts`, while
-  every other tunable lives in a table. It is the one remaining exception to that rule.
+Two entries that stood here — `Customer.email` not being `@unique`, and `PROMOTION_BOOST`
+being a constant — are now closed. They had been deferred on the grounds that a unique
+constraint against a populated table can fail mid-apply on duplicate data. That was worth
+checking rather than assuming: the database held zero duplicate customer emails and zero
+duplicate approval sequences, before and after a 40-customer bulk load, so the constraint
+was applied. `promotionBoost` now lives in `RiskConfig` alongside every other tunable and
+is editable at `/admin/risk-config`.
+
+What remains, each deliberate:
+
 - **Accepting a counter-offer returns the quotation to `DRAFT`** rather than auto-routing
-  it to the next approval stage. This is deliberate: it strips approvals that no longer
-  cover the deal and hands it back to the rep with the new score and the reason shown.
-  Silently escalating to Finance without the rep seeing it is governance you cannot see.
-  The quote cannot be confirmed until re-approved — `verify-flow` section 16 asserts it.
+  it to the next approval stage. This is a decision, not a gap: it strips approvals that no
+  longer cover the deal and hands it back to the rep with the new score and the reason
+  shown. Silently escalating to Finance without the rep seeing it is governance you cannot
+  see. The quote cannot be confirmed until re-approved — `verify-flow` section 16 asserts
+  exactly that.
 - **Five seeded `CONFIRMED` quotations have no `SalesOrder`.** They come from
   `prisma/seed.ts` and represent deal history, not deals this system executed. Only
   quotations confirmed through the running application carry the full order, invoice,
-  fulfilment and billing chain, because that chain is created by the confirmation
-  transaction in `confirmationService.ts`. The bulk generator deliberately produces no
-  `CONFIRMED` rows for the same reason.
-- **Schema hygiene deferred:** `ApprovalRule.sequence` is not `@unique` and `SalesOrder` /
-  `Invoice` lack some indexes. Both are migrations against populated tables; neither
-  affects correctness at demo scale.
+  fulfilment and billing chain, because that chain is created in one transaction in
+  `confirmationService.ts`. The bulk generator deliberately produces no `CONFIRMED` rows
+  for the same reason — fabricating them would misrepresent work that never happened.
+- **The UI is light-only by design** (`data-theme="light"` in the root layout, reasoning in
+  `globals.css`). The component library carries `dark:` variants throughout, so enabling it
+  is a one-line change, but that has not been visually reviewed.
 
 ---
 

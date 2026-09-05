@@ -3,7 +3,12 @@ import { prisma } from "@/infrastructure/db";
 import { scopedQuotationWhere } from "@/application/queries";
 import type { SessionUser } from "@/infrastructure/auth/session";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
-import { rankSuggestions, netLineTotal, type UpsellCandidate } from "@/domain/upsell/recommend";
+import {
+  rankSuggestions,
+  netLineTotal,
+  DEFAULT_PROMOTION_BOOST,
+  type UpsellCandidate,
+} from "@/domain/upsell/recommend";
 
 /**
  * Upsell suggestions for a quotation in progress.
@@ -63,5 +68,11 @@ export async function suggestionsFor(user: SessionUser, quotationId: string) {
     minMarginPct: dbToPct(rule.minMarginPct),
   }));
 
-  return rankSuggestions(candidates, cartProductIds, revenuePaise, costPaise);
+  // The promotion boost is a business tunable like every other number in this system, so
+  // it comes from the config table. No row is a supported state — the domain default keeps
+  // ranking identical on a database nobody has configured.
+  const config = await prisma.riskConfig.findUnique({ where: { id: "singleton" } });
+  const promotionBoost = config ? dbToPct(config.promotionBoost) : DEFAULT_PROMOTION_BOOST;
+
+  return rankSuggestions(candidates, cartProductIds, revenuePaise, costPaise, promotionBoost);
 }

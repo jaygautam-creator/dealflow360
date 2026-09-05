@@ -39,14 +39,21 @@ export interface Suggestion {
   reason: string;
 }
 
-/** Promoted products are ranked above equally-correlated unpromoted ones. */
-const PROMOTION_BOOST = 1.25;
+/**
+ * Promoted products are ranked above equally-correlated unpromoted ones.
+ *
+ * Passed in rather than read here, because this layer imports nothing and must not start.
+ * The constant remains as the documented fallback for a database with no RiskConfig row,
+ * so the ranking behaves identically on a system nobody has configured.
+ */
+export const DEFAULT_PROMOTION_BOOST = 1.25;
 
 export function rankSuggestions(
   candidates: readonly UpsellCandidate[],
   productIdsAlreadyInCart: readonly string[],
   orderRevenuePaise: number,
   orderCostPaise: number,
+  promotionBoost: number = DEFAULT_PROMOTION_BOOST,
 ): Suggestion[] {
   const inCart = new Set(productIdsAlreadyInCart);
   const currentMarginPct = marginPct(orderRevenuePaise, orderCostPaise);
@@ -60,7 +67,7 @@ export function rankSuggestions(
         orderCostPaise + c.costPaise,
       );
       const marginDeltaPct = round2(newMarginPct - currentMarginPct);
-      const rankScore = round2(c.coPurchaseScore * (c.isPromoted ? PROMOTION_BOOST : 1));
+      const rankScore = round2(c.coPurchaseScore * (c.isPromoted ? promotionBoost : 1));
 
       return {
         ruleId: c.ruleId,

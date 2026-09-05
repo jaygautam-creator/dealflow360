@@ -11,6 +11,9 @@ const schema = z.object({
   stalledAfterDays: z.coerce.number().int().min(1),
   anomalyZThreshold: z.coerce.number().min(0),
   anomalyMinSamples: z.coerce.number().int().min(1),
+  // 1 means "no boost". Below 1 would rank a promoted product *below* an equally
+  // correlated one, which is never what a promotion is for.
+  promotionBoost: z.coerce.number().min(1).max(10),
 });
 
 export async function updateRiskConfig(formData: FormData) {
@@ -23,6 +26,7 @@ export async function updateRiskConfig(formData: FormData) {
     stalledAfterDays: formData.get("stalledAfterDays"),
     anomalyZThreshold: formData.get("anomalyZThreshold"),
     anomalyMinSamples: formData.get("anomalyMinSamples"),
+    promotionBoost: formData.get("promotionBoost"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 

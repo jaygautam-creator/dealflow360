@@ -23,6 +23,7 @@ export default async function RiskConfigPage() {
           stalledAfterDays: String(config.stalledAfterDays),
           anomalyZThreshold: config.anomalyZThreshold.toString(),
           anomalyMinSamples: String(config.anomalyMinSamples),
+          promotionBoost: config.promotionBoost.toString(),
         }}
       />
     </div>

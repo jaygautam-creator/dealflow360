@@ -60,7 +60,10 @@ enum CustomerTier {
 model Customer {
   id       String       @id @default(cuid())
   name     String
-  email    String
+  // Unique because a customer's email is how a portal login is matched to the account it
+  // may read. Two customers sharing one address is a tenancy question waiting to happen,
+  // even though customers are admin-created rather than self-registered.
+  email    String       @unique
   tier     CustomerTier @default(BRONZE)
   currency String       @default("INR")
   city     String?
@@ -223,9 +226,10 @@ model ApprovalRule {
   maxScore Decimal? @db.Decimal(6, 2) // exclusive; null = unbounded
   requiresManager Boolean @default(false)
   requiresFinance Boolean @default(false)
-  sequence Int     @default(0)
-
-  @@index([sequence])
+  // Unique because the chain is ordered by it. Two rules sharing a sequence makes the
+  // order of the approval chain depend on whatever the database returns first, which is
+  // not a thing governance should be decided by.
+  sequence Int     @default(0) @unique
 }
 
 // Singleton row holding the tunables the risk and health engines read at runtime.
@@ -244,6 +248,12 @@ model RiskConfig {
 
   // Minimum quotation history a rep needs before anomaly detection is meaningful.
   anomalyMinSamples Int @default(3)
+
+  // Multiplier applied to a promoted product's co-purchase score when ranking upsell
+  // suggestions. Lived in src/domain/upsell/recommend.ts as a bare constant, which made
+  // it the one tunable in the system a business could not reach — the exception that
+  // undermined the rule every other number here follows.
+  promotionBoost Decimal @default(1.25) @db.Decimal(5, 2)
 
   updatedAt DateTime @updatedAt
 }

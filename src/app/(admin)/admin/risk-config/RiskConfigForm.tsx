@@ -11,6 +11,7 @@ export interface RiskConfigValues {
   stalledAfterDays: string;
   anomalyZThreshold: string;
   anomalyMinSamples: string;
+  promotionBoost: string;
 }
 
 export function RiskConfigForm({ defaults }: { defaults: RiskConfigValues }) {
@@ -67,6 +68,15 @@ export function RiskConfigForm({ defaults }: { defaults: RiskConfigValues }) {
             required
             hint="Minimum quotation history a rep needs before anomaly detection is meaningful."
             defaultValue={defaults.anomalyMinSamples}
+          />
+          <Input
+            name="promotionBoost"
+            label="Promotion boost"
+            type="number"
+            step="0.01"
+            required
+            hint="Multiplier applied to a promoted product's co-purchase score when ranking upsell suggestions. 1.00 ranks promoted and unpromoted products alike."
+            defaultValue={defaults.promotionBoost}
           />
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           {saved && !error && (
