@@ -72,8 +72,8 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
       brand="DealFlow360"
       navItems={navItems}
       currentUser={{ name: user.name, role: formatRole(user.role) }}
+      topBar={<WorkspaceTopBar showBackend={can(user.role, P.CONFIG_MANAGE) || can(user.role, P.CONFIG_APPROVAL_CHAIN)} />}
     >
-      <WorkspaceTopBar showBackend={can(user.role, P.CONFIG_MANAGE) || can(user.role, P.CONFIG_APPROVAL_CHAIN)} />
       {children}
     </AppShell>
   );

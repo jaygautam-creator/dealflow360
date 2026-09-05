@@ -69,12 +69,14 @@ export default async function PipelinePage() {
             {STAGES.map((stage) => {
               const inStage = quotations.filter((q) => stage.key.includes(q.status));
               return (
-                <section key={stage.label} className="w-64 shrink-0 space-y-3">
-                  <div className="flex items-center justify-between px-1">
-                    <h2 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <section key={stage.label} className="flex w-64 shrink-0 flex-col rounded-xl bg-neutral-100/70 p-2">
+                  <div className="flex items-center justify-between px-1.5 pb-2 pt-1">
+                    <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-300">
                       {stage.label}
                     </h2>
-                    <span className="text-xs tabular-nums text-neutral-500">{inStage.length}</span>
+                    <span className="rounded-full bg-white px-1.5 py-0.5 text-xs font-medium tabular-nums text-neutral-500">
+                      {inStage.length}
+                    </span>
                   </div>
 
                   <div className="space-y-2">
@@ -111,10 +113,10 @@ export default async function PipelinePage() {
                         </Card>
                       </Link>
                     ))}
+                    {/* An empty lane is information, not a problem, so it whispers rather
+                        than drawing a full-size dashed box the eye keeps returning to. */}
                     {inStage.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-neutral-200 px-3 py-4 text-center text-xs text-neutral-400 dark:border-neutral-800">
-                        Nothing here
-                      </p>
+                      <p className="px-1.5 py-3 text-xs text-neutral-400">Nothing here</p>
                     ) : null}
                   </div>
                 </section>

@@ -26,9 +26,16 @@ export interface AppShellProps {
   currentUser?: AppShellUser;
   children: ReactNode;
   brand?: ReactNode;
+  /**
+   * A bar of area-level actions (search, reload, sign out) pinned above the scrolling
+   * content. It sits outside <main> on purpose: rendered as a child it inherited main's
+   * padding and read as a stray white panel floating inside the page rather than as
+   * part of the application chrome.
+   */
+  topBar?: ReactNode;
 }
 
-export function AppShell({ navItems, currentUser, children, brand }: AppShellProps) {
+export function AppShell({ navItems, currentUser, children, brand, topBar }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
 
@@ -140,6 +147,11 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
             {typeof brand === "string" || brand == null ? (brand ?? "DealFlow360") : "DealFlow360"}
           </span>
         </header>
+        {topBar ? (
+          <div className="sticky top-0 z-30 shrink-0 border-b border-neutral-200 bg-white/85 backdrop-blur-sm">
+            {topBar}
+          </div>
+        ) : null}
         <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">{children}</main>
       </div>
     </div>

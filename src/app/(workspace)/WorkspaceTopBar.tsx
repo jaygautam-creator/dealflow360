@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, ExternalLink, LogOut } from "lucide-react";
+import { RefreshCw, ExternalLink, LogOut, Search } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
 /**
@@ -33,7 +33,24 @@ export function WorkspaceTopBar({ showBackend }: { showBackend: boolean }) {
   }
 
   return (
-    <div className="flex items-center justify-end gap-2 border-b border-neutral-200 bg-white px-4 py-2 md:px-8 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="flex items-center gap-2 px-4 py-2.5 md:px-8">
+      {/* A plain GET form rather than client-side filtering: the result is a real,
+          linkable, shareable URL, and the search runs against the caller's own scoped
+          query on the server instead of over whatever rows the client happens to hold. */}
+      <form action="/workspace/quotations" className="relative min-w-0 flex-1 max-w-sm">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neutral-400"
+        />
+        <input
+          type="search"
+          name="q"
+          placeholder="Search customer or quotation number…"
+          aria-label="Search quotations"
+          className="h-9 w-full rounded-lg border border-neutral-200 bg-neutral-50 pl-9 pr-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-indigo-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100"
+        />
+      </form>
+      <div className="ml-auto flex items-center gap-1">
       <Button variant="ghost" size="sm" loading={pending} leftIcon={<RefreshCw className="size-4" />} onClick={reload}>
         Reload Data
       </Button>
@@ -45,6 +62,7 @@ export function WorkspaceTopBar({ showBackend }: { showBackend: boolean }) {
       <Button variant="ghost" size="sm" loading={loggingOut} leftIcon={<LogOut className="size-4" />} onClick={closeWorkspace}>
         Close Workspace
       </Button>
+      </div>
     </div>
   );
 }

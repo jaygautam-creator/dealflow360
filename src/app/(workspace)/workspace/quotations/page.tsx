@@ -15,15 +15,33 @@ export const dynamic = "force-dynamic";
  * The table counterpart to the pipeline board. The board answers "where is everything
  * stuck"; this answers "find me that one deal" — sorted, dense and scannable.
  */
-export default async function QuotationsPage() {
+export default async function QuotationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const user = await requireUserPage("/workspace/quotations");
-  const quotations = await listQuotations(user);
+  const q = ((await searchParams).q ?? "").trim();
+  const all = await listQuotations(user);
+
+  // Filtered after the scoped query rather than inside it: listQuotations already applies
+  // the caller's tenancy filter, so search can only ever narrow what they were entitled to
+  // see. A search that widened the result set would be a much worse bug than a slow one,
+  // and at demo scale this list is small enough that the round trip is not the cost.
+  const needle = q.toLowerCase();
+  const quotations = needle
+    ? all.filter(
+        (item) =>
+          item.number.toLowerCase().includes(needle) ||
+          item.customer.name.toLowerCase().includes(needle),
+      )
+    : all;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Quotations"
-        subtitle={`${quotations.length} in view`}
+        subtitle={q ? `${quotations.length} matching “${q}”` : `${quotations.length} in view`}
         actions={
           <Link href="/workspace/quotations/new">
             <Button><Plus className="size-4" />New quotation</Button>
@@ -32,7 +50,10 @@ export default async function QuotationsPage() {
       />
 
       {quotations.length === 0 ? (
-        <EmptyState title="No quotations" description="Create one to get started." />
+        <EmptyState
+          title={q ? `Nothing matches “${q}”` : "No quotations"}
+          description={q ? "Try a customer name or a quotation number." : "Create one to get started."}
+        />
       ) : (
         <Card>
           <CardContent className="p-0">
