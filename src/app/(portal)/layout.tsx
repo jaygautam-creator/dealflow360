@@ -22,8 +22,8 @@ export default async function PortalLayout({ children }: { children: React.React
   return (
     // The portal borrows nothing from the workspace's indigo — teal marks it, at a glance,
     // as a different surface for a different audience, not just the same app with no sidebar.
-    <div className="min-h-dvh bg-teal-50/40 dark:bg-neutral-950">
-      <header className="border-b border-teal-100 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="min-h-dvh bg-neutral-50 dark:bg-neutral-950">
+      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link href="/portal" className="flex items-center gap-2">
             <div className="flex size-8 items-center justify-center rounded-lg bg-teal-600 text-xs font-bold text-white">

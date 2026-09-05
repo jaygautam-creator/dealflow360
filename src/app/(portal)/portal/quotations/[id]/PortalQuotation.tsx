@@ -82,33 +82,94 @@ export function PortalQuotation({
     }
   }
 
+  const canAct = !confirmed && (quotation.status === "SENT" || quotation.status === "UNDER_NEGOTIATION");
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-mono text-xl font-semibold text-neutral-900 dark:text-neutral-50">
-            {quotation.number}
-          </h1>
-          <p className="mt-1 break-words text-sm text-neutral-500">
-            Your contact: {quotation.repName} · {quotation.repEmail}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge tone={confirmed ? "success" : quotation.status === "UNDER_NEGOTIATION" ? "warning" : "info"}>
-            {confirmed ? "Confirmed" : quotation.status === "UNDER_NEGOTIATION" ? "In discussion" : "Awaiting your review"}
-          </Badge>
-          {!confirmed && (quotation.status === "SENT" || quotation.status === "UNDER_NEGOTIATION") ? (
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-mono text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+                {quotation.number}
+              </h1>
+              <Badge tone={confirmed ? "success" : quotation.status === "UNDER_NEGOTIATION" ? "warning" : "info"}>
+                {confirmed ? "Confirmed" : quotation.status === "UNDER_NEGOTIATION" ? "In discussion" : "Awaiting your review"}
+              </Badge>
+            </div>
+            <p className="mt-1 break-words text-sm text-neutral-500">
+              Your contact: {quotation.repName} · {quotation.repEmail}
+            </p>
+            <p className="mt-2 text-2xl font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
+              {money(quotation.total)}
+            </p>
+          </div>
+          {canAct ? (
             <Button
               loading={working}
               onClick={() => void confirmTerms()}
-              className="bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600 text-white"
+              className="w-full shrink-0 bg-emerald-600 py-3 text-base hover:bg-emerald-500 focus-visible:outline-emerald-600 sm:w-auto"
             >
-              <CheckCircle className="size-4" />
+              <CheckCircle className="size-5" />
               Confirm quotation
             </Button>
           ) : null}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
+
+      {canAct ? (
+        <Card className="border-teal-200 dark:border-teal-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-neutral-900 dark:text-neutral-100">
+              <MessageSquare className="size-4 text-teal-600 dark:text-teal-400" />
+              Want a different price? Ask here.
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {error ? (
+              <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
+                {error}
+              </p>
+            ) : null}
+            {lineId ? (
+              <p className="text-xs text-teal-700 dark:text-teal-400">
+                Your message is attached to a specific item.{" "}
+                <button type="button" onClick={() => setLineId(null)} className="underline">
+                  ask about the whole quotation instead
+                </button>
+              </p>
+            ) : null}
+            <Textarea
+              label="Your message"
+              rows={3}
+              placeholder="Ask a question, or explain what you need changed…"
+              value={body}
+              disabled={working}
+              onChange={(e) => setBody(e.target.value)}
+            />
+            <div className="flex flex-wrap items-end gap-2">
+              <Input
+                label="Propose a discount % (optional)"
+                type="number" min={0} max={100} step={0.5}
+                placeholder="e.g. 20"
+                value={counter}
+                disabled={working}
+                onChange={(e) => setCounter(e.target.value)}
+                containerClassName="w-full sm:w-56"
+                hint="Your sales contact reviews this before anything changes."
+              />
+              <Button
+                loading={working}
+                onClick={() => void send()}
+                className="w-full bg-teal-600 hover:bg-teal-500 focus-visible:outline-teal-600 disabled:bg-teal-300 sm:w-auto"
+              >
+                <Send className="size-4" />
+                Send
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader><CardTitle>What you are quoted for</CardTitle></CardHeader>
@@ -192,7 +253,7 @@ export function PortalQuotation({
         <CardContent className="space-y-4">
           {quotation.messages.length === 0 ? (
             <p className="text-sm text-neutral-500">
-              No messages yet. Ask a question or propose a different price below.
+              No messages yet.{canAct ? " Ask a question or propose a different price above." : ""}
             </p>
           ) : (
             <ol className="space-y-3">
@@ -217,52 +278,6 @@ export function PortalQuotation({
               ))}
             </ol>
           )}
-
-          {!confirmed ? (
-            <div className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-              {error ? (
-                <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                  {error}
-                </p>
-              ) : null}
-              {lineId ? (
-                <p className="text-xs text-teal-700 dark:text-teal-400">
-                  Your message is attached to a specific item.{" "}
-                  <button type="button" onClick={() => setLineId(null)} className="underline">
-                    ask about the whole quotation instead
-                  </button>
-                </p>
-              ) : null}
-              <Textarea
-                label="Message"
-                rows={3}
-                placeholder="Ask a question, or explain what you need changed…"
-                value={body}
-                disabled={working}
-                onChange={(e) => setBody(e.target.value)}
-              />
-              <div className="flex flex-wrap items-end gap-2">
-                <Input
-                  label="Propose a discount % (optional)"
-                  type="number" min={0} max={100} step={0.5}
-                  placeholder="e.g. 20"
-                  value={counter}
-                  disabled={working}
-                  onChange={(e) => setCounter(e.target.value)}
-                  containerClassName="w-56"
-                  hint="Your sales contact reviews this before anything changes."
-                />
-                <Button
-                  loading={working}
-                  onClick={() => void send()}
-                  className="bg-teal-600 hover:bg-teal-500 focus-visible:outline-teal-600 disabled:bg-teal-300"
-                >
-                  <Send className="size-4" />
-                  Send
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </div>
