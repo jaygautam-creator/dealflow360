@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -22,6 +23,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   useEffect(() => {
     // Server errors already reach the server log. This catches the client-side half, so a
     // failure that only happens after hydration is not invisible.
@@ -53,7 +56,7 @@ export default function GlobalError({
 
         <div className="mt-6 flex items-center justify-center gap-2">
           <Button onClick={reset}>Try again</Button>
-          <Button variant="secondary" onClick={() => { window.location.href = "/"; }}>
+          <Button variant="secondary" onClick={() => router.push("/")}>
             Start over
           </Button>
         </div>

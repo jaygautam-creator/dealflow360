@@ -172,12 +172,27 @@ export async function confirmPortalQuotation(
   });
 }
 
+/**
+ * A quotation line as this function needs it, derived from the schema rather than
+ * hand-written.
+ *
+ * It was `Array<any>`, which meant a schema change that dropped or renamed one of these
+ * relations would compile cleanly and fail at confirmation — the single most expensive
+ * place in the system to discover a mistake, since that is the transaction that creates
+ * the order, the warehouse split, the invoices and the billing schedules together.
+ * Deriving it from Prisma keeps it exact without anyone maintaining a copy by hand; both
+ * call sites already load precisely this include.
+ */
+type ConfirmableLine = Prisma.QuotationLineGetPayload<{
+  include: { product: true; variant: true; plan: true };
+}>;
+
 async function executeOrderConfirmation(
   tx: Prisma.TransactionClient,
   quotation: {
     id: string;
     number: string;
-    lines: Array<any>;
+    lines: ConfirmableLine[];
   },
   actorId: string,
   auditReason: string,

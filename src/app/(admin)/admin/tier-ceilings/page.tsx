@@ -4,6 +4,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createTierCeiling, deleteTierCeiling, updateTierCeiling } from "./actions";
 
+export const metadata = { title: "Tier Ceilings" };
+
 export default async function TierCeilingsPage() {
   const ceilings = await prisma.tierDiscountCeiling.findMany({ orderBy: { tier: "asc" } });
 

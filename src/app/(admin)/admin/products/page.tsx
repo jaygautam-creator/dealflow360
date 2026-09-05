@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createProduct, deleteProduct, updateProduct } from "./actions";
 
+export const metadata = { title: "Products" };
+
 export default async function ProductsPage() {
   const [products, categories, plans] = await Promise.all([
     prisma.product.findMany({ include: { category: true }, orderBy: { sku: "asc" } }),

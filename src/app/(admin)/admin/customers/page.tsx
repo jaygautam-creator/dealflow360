@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createCustomer, deleteCustomer, updateCustomer } from "./actions";
 
+export const metadata = { title: "Customers" };
+
 export default async function CustomersPage() {
   const customers = await prisma.customer.findMany({ orderBy: { name: "asc" } });
 

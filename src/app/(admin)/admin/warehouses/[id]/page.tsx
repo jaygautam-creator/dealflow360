@@ -6,6 +6,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../../_components/EntityManager";
 import { createStockLevel, deleteStockLevel, updateStockLevel } from "./actions";
 
+export const metadata = { title: "Warehouse" };
+
 export default async function WarehouseStockPage({
   params,
 }: {

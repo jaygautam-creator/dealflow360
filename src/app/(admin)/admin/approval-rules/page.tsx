@@ -2,6 +2,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createApprovalRule, deleteApprovalRule, updateApprovalRule } from "./actions";
 
+export const metadata = { title: "Approval Rules" };
+
 export default async function ApprovalRulesPage() {
   const rules = await prisma.approvalRule.findMany({ orderBy: { sequence: "asc" } });
 

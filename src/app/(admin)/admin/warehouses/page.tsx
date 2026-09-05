@@ -2,6 +2,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createWarehouse, deleteWarehouse, updateWarehouse } from "./actions";
 
+export const metadata = { title: "Warehouses" };
+
 export default async function WarehousesPage() {
   const warehouses = await prisma.warehouse.findMany({ orderBy: { code: "asc" } });
 

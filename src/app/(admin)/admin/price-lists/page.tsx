@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createPriceList, deletePriceList, updatePriceList } from "./actions";
 
+export const metadata = { title: "Price Lists" };
+
 export default async function PriceListsPage() {
   const priceLists = await prisma.priceList.findMany({
     include: { _count: { select: { items: true } } },

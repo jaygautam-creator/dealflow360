@@ -114,7 +114,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       {trace.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Planner's original reasoning</CardTitle>
+            <CardTitle>Planner&apos;s original reasoning</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="space-y-2 text-sm text-neutral-600">

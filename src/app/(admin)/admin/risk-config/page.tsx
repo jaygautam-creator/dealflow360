@@ -2,6 +2,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { prisma } from "@/infrastructure/db";
 import { RiskConfigForm } from "./RiskConfigForm";
 
+export const metadata = { title: "Risk Configuration" };
+
 export default async function RiskConfigPage() {
   const config = await prisma.riskConfig.upsert({
     where: { id: "singleton" },

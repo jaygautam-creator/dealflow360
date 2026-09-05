@@ -66,6 +66,8 @@ const SECTIONS = [
   },
 ] as const;
 
+export const metadata = { title: "Configuration" };
+
 export default async function AdminOverviewPage() {
   const user = await getSession();
   const mayConfigure = user ? can(user.role, P.CONFIG_MANAGE) : false;

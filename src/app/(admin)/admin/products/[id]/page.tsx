@@ -6,6 +6,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../../_components/EntityManager";
 import { createVariant, deleteVariant, updateVariant } from "./actions";
 
+export const metadata = { title: "Product" };
+
 export default async function ProductVariantsPage({
   params,
 }: {

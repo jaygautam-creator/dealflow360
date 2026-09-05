@@ -8,6 +8,8 @@ import {
   updateSubscriptionPlan,
 } from "./actions";
 
+export const metadata = { title: "Subscription Plans" };
+
 export default async function SubscriptionPlansPage() {
   const plans = await prisma.subscriptionPlan.findMany({ orderBy: { name: "asc" } });
 

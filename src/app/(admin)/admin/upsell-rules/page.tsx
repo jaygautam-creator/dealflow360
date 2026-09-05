@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createUpsellRule, deleteUpsellRule, updateUpsellRule } from "./actions";
 
+export const metadata = { title: "Upsell Rules" };
+
 export default async function UpsellRulesPage() {
   const [rules, products] = await Promise.all([
     prisma.upsellRule.findMany({

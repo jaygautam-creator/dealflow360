@@ -26,7 +26,7 @@ export function Table({ className, wrapperClassName, ...props }: TableProps) {
   );
 }
 
-export interface THeadProps extends HTMLAttributes<HTMLTableSectionElement> {}
+export type THeadProps = HTMLAttributes<HTMLTableSectionElement>;
 
 export function THead({ className, ...props }: THeadProps) {
   return (
@@ -40,7 +40,7 @@ export function THead({ className, ...props }: THeadProps) {
   );
 }
 
-export interface TBodyProps extends HTMLAttributes<HTMLTableSectionElement> {}
+export type TBodyProps = HTMLAttributes<HTMLTableSectionElement>;
 
 export function TBody({ className, ...props }: TBodyProps) {
   return (
@@ -54,7 +54,7 @@ export function TBody({ className, ...props }: TBodyProps) {
   );
 }
 
-export interface TRProps extends HTMLAttributes<HTMLTableRowElement> {}
+export type TRProps = HTMLAttributes<HTMLTableRowElement>;
 
 export function TR({ className, ...props }: TRProps) {
   return (
@@ -68,7 +68,7 @@ export function TR({ className, ...props }: TRProps) {
   );
 }
 
-export interface THProps extends ThHTMLAttributes<HTMLTableCellElement> {}
+export type THProps = ThHTMLAttributes<HTMLTableCellElement>;
 
 export function TH({ className, ...props }: THProps) {
   return (
@@ -80,7 +80,7 @@ export function TH({ className, ...props }: THProps) {
   );
 }
 
-export interface TDProps extends TdHTMLAttributes<HTMLTableCellElement> {}
+export type TDProps = TdHTMLAttributes<HTMLTableCellElement>;
 
 export function TD({ className, ...props }: TDProps) {
   return (

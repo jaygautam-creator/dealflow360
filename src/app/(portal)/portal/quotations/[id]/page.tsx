@@ -5,6 +5,7 @@ import { requireUserPage } from "@/infrastructure/auth/guards";
 import { getPortalQuotation } from "@/application/portalService";
 import { PortalQuotation } from "./PortalQuotation";
 
+export const metadata = { title: "Your quotation" };
 export const dynamic = "force-dynamic";
 
 export default async function PortalQuotationPage({ params }: { params: Promise<{ id: string }> }) {

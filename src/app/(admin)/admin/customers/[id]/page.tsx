@@ -8,6 +8,8 @@ import { prisma } from "@/infrastructure/db";
 import { PortalUserPanel } from "./PortalUserPanel";
 import { createPortalUser, resetPortalUserPassword } from "./actions";
 
+export const metadata = { title: "Customer" };
+
 export default async function CustomerDetailPage({
   params,
 }: {

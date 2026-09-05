@@ -6,7 +6,7 @@ describe("Quotation Mutation Ownership Security (BOLA / IDOR protection)", () =>
   const quoteOwnedByRep2 = { ownerId: "sales-rep-2" };
 
   const rep1 = { id: "sales-rep-1", role: "SALES_REP" as const };
-  const rep2 = { id: "sales-rep-2", role: "SALES_REP" as const };
+  const _rep2 = { id: "sales-rep-2", role: "SALES_REP" as const };
   const manager = { id: "manager-1", role: "SALES_MANAGER" as const };
   const admin = { id: "admin-1", role: "ADMIN" as const };
   const finance = { id: "finance-1", role: "FINANCE" as const };
@@ -44,7 +44,7 @@ describe("Negotiation Line Validation & Cross-Quotation Isolation", () => {
     id: "quotation-a",
     lines: [{ id: "line-a1" }, { id: "line-a2" }],
   };
-  const quotationB = {
+  const _quotationB = {
     id: "quotation-b",
     lines: [{ id: "line-b1" }],
   };

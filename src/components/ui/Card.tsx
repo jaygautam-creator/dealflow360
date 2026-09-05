@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "./cn";
 
-export interface CardProps extends HTMLAttributes<HTMLDivElement> {}
+export type CardProps = HTMLAttributes<HTMLDivElement>;
 
 export function Card({ className, ...props }: CardProps) {
   return (
@@ -15,7 +15,7 @@ export function Card({ className, ...props }: CardProps) {
   );
 }
 
-export interface CardHeaderProps extends HTMLAttributes<HTMLDivElement> {}
+export type CardHeaderProps = HTMLAttributes<HTMLDivElement>;
 
 export function CardHeader({ className, ...props }: CardHeaderProps) {
   return (
@@ -29,7 +29,7 @@ export function CardHeader({ className, ...props }: CardHeaderProps) {
   );
 }
 
-export interface CardTitleProps extends HTMLAttributes<HTMLHeadingElement> {}
+export type CardTitleProps = HTMLAttributes<HTMLHeadingElement>;
 
 export function CardTitle({ className, ...props }: CardTitleProps) {
   return (
@@ -43,7 +43,7 @@ export function CardTitle({ className, ...props }: CardTitleProps) {
   );
 }
 
-export interface CardContentProps extends HTMLAttributes<HTMLDivElement> {}
+export type CardContentProps = HTMLAttributes<HTMLDivElement>;
 
 export function CardContent({ className, ...props }: CardContentProps) {
   return <div className={cn("px-5 py-4", className)} {...props} />;

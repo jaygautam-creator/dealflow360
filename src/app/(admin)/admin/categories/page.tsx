@@ -3,6 +3,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../_components/EntityManager";
 import { createCategory, deleteCategory, updateCategory } from "./actions";
 
+export const metadata = { title: "Categories" };
+
 export default async function CategoriesPage() {
   const categories = await prisma.productCategory.findMany({
     orderBy: { name: "asc" },

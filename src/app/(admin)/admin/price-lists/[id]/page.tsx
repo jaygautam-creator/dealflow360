@@ -6,6 +6,8 @@ import { prisma } from "@/infrastructure/db";
 import { EntityManager } from "../../_components/EntityManager";
 import { createPriceListItem, deletePriceListItem, updatePriceListItem } from "./actions";
 
+export const metadata = { title: "Price List" };
+
 export default async function PriceListItemsPage({
   params,
 }: {

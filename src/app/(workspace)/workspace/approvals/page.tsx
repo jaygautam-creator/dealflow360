@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { CheckSquare } from "lucide-react";
-import { requirePermissionApi } from "@/infrastructure/auth/guards";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { redirect } from "next/navigation";

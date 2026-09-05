@@ -1,6 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
+/** The four options rendered below. Named so the cast on change asserts something real
+    rather than going through `any`, which would accept any string at all. */
+type PaymentMethod = "BANK" | "CASH" | "CARD" | "UPI";
 import { useRouter } from "next/navigation";
 import { CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -20,7 +24,7 @@ export function RecordPaymentButton({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(outstandingRupees));
-  const [method, setMethod] = useState<"BANK" | "CASH" | "CARD" | "UPI">("BANK");
+  const [method, setMethod] = useState<PaymentMethod>("BANK");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -102,7 +106,7 @@ export function RecordPaymentButton({
           <Select
             label="Payment method"
             value={method}
-            onChange={(e) => setMethod(e.target.value as any)}
+            onChange={(e) => setMethod(e.target.value as PaymentMethod)}
             disabled={submitting || pending}
           >
             <option value="BANK">Bank transfer</option>

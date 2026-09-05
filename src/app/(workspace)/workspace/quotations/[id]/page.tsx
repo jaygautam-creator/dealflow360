@@ -8,6 +8,7 @@ import { dbToPaise, dbToPct } from "@/infrastructure/money";
 import { QuotationBuilder } from "./QuotationBuilder";
 import type { RiskAssessment } from "@/domain/risk/types";
 
+export const metadata = { title: "Quotation" };
 export const dynamic = "force-dynamic";
 
 export default async function QuotationPage({ params }: { params: Promise<{ id: string }> }) {
