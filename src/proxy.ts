@@ -24,6 +24,7 @@ const PROTECTED: { prefix: string; permission: Permission }[] = [
   { prefix: "/admin/approval-rules", permission: P.CONFIG_APPROVAL_CHAIN },
   { prefix: "/admin/tier-ceilings", permission: P.CONFIG_APPROVAL_CHAIN },
   { prefix: "/admin/risk-config", permission: P.CONFIG_APPROVAL_CHAIN },
+  { prefix: "/admin/customers", permission: P.CONFIG_MANAGE },
   { prefix: "/admin/products", permission: P.CONFIG_MANAGE },
   { prefix: "/admin/categories", permission: P.CONFIG_MANAGE },
   { prefix: "/admin/price-lists", permission: P.CONFIG_MANAGE },

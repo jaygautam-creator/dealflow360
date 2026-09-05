@@ -58,6 +58,9 @@ export default async function LoginPage({
           </p>
           <div className="mt-8">
             <LoginForm next={next} />
+            <p className="mt-5 text-center text-xs text-neutral-400">
+              Forgot your password? Ask your administrator to reset it.
+            </p>
           </div>
         </div>
       </div>

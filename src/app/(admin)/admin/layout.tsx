@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { redirect } from "next/navigation";
+import { AdminTopBar } from "../AdminTopBar";
 
 /**
  * Admin route group guard.
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { label: "Approval Rules", href: "/admin/approval-rules", permission: P.CONFIG_APPROVAL_CHAIN },
   { label: "Tier Ceilings", href: "/admin/tier-ceilings", permission: P.CONFIG_APPROVAL_CHAIN },
   { label: "Risk Config", href: "/admin/risk-config", permission: P.CONFIG_APPROVAL_CHAIN },
+  { label: "Customers", href: "/admin/customers", permission: P.CONFIG_MANAGE },
   { label: "Products", href: "/admin/products", permission: P.CONFIG_MANAGE },
   { label: "Categories", href: "/admin/categories", permission: P.CONFIG_MANAGE },
   { label: "Price Lists", href: "/admin/price-lists", permission: P.CONFIG_MANAGE },
@@ -51,6 +53,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       brand="DealFlow360 Admin"
       currentUser={{ name: user.name, role: formatRole(user.role) }}
     >
+      <AdminTopBar />
       {children}
     </AppShell>
   );
