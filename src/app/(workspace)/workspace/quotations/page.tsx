@@ -1,0 +1,99 @@
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { requireUserPage } from "@/infrastructure/auth/guards";
+import { listQuotations } from "@/application/queries";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+
+export const metadata = { title: "Quotations" };
+export const dynamic = "force-dynamic";
+
+/**
+ * The table counterpart to the pipeline board. The board answers "where is everything
+ * stuck"; this answers "find me that one deal" — sorted, dense and scannable.
+ */
+export default async function QuotationsPage() {
+  const user = await requireUserPage("/workspace/quotations");
+  const quotations = await listQuotations(user);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Quotations"
+        subtitle={`${quotations.length} in view`}
+        actions={
+          <Link href="/workspace/quotations/new">
+            <Button><Plus className="size-4" />New quotation</Button>
+          </Link>
+        }
+      />
+
+      {quotations.length === 0 ? (
+        <EmptyState title="No quotations" description="Create one to get started." />
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500">
+                    <th className="px-4 py-3 font-medium">Number</th>
+                    <th className="px-4 py-3 font-medium">Customer</th>
+                    <th className="px-4 py-3 font-medium">Owner</th>
+                    <th className="px-4 py-3 font-medium">Stage</th>
+                    <th className="px-4 py-3 text-right font-medium">Risk</th>
+                    <th className="px-4 py-3 text-right font-medium">Total</th>
+                    <th className="px-4 py-3 text-right font-medium">Last touched</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {quotations.map((q) => (
+                    <tr key={q.id} className="transition hover:bg-neutral-50">
+                      <td className="px-4 py-3">
+                        <Link href={`/workspace/quotations/${q.id}`} className="font-mono text-xs font-medium text-indigo-600 hover:underline">
+                          {q.number}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-neutral-900">{q.customer.name}</span>
+                        <span className="ml-2 text-xs text-neutral-400">{q.customer.tier}</span>
+                      </td>
+                      <td className="px-4 py-3 text-neutral-600">{q.owner.name}</td>
+                      <td className="px-4 py-3"><Badge tone={statusTone(q.status)}>{label(q.status)}</Badge></td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {Number(q.riskScore) > 0 ? (
+                          <span className={Number(q.riskScore) >= 5 ? "font-medium text-red-600" : "font-medium text-amber-600"}>
+                            {Number(q.riskScore)}
+                          </span>
+                        ) : <span className="text-neutral-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums text-neutral-900">{money(Number(q.total))}</td>
+                      <td className="px-4 py-3 text-right text-xs text-neutral-400">
+                        {new Date(q.lastActivityAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function label(s: string) { return s.replaceAll("_", " ").toLowerCase(); }
+function statusTone(s: string): BadgeTone {
+  if (s === "CONFIRMED") return "success";
+  if (s === "REJECTED" || s === "CANCELLED") return "danger";
+  if (s.startsWith("PENDING")) return "warning";
+  if (s === "APPROVED") return "info";
+  return "neutral";
+}
+function money(r: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(r);
+}

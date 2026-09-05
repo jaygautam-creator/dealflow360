@@ -83,6 +83,17 @@ check "$(seen "$PORTAL_LOGIN" '"redirectTo":"/portal"')" "yes" "Portal user is d
 check "$(status portal /workspace)" "307" "Portal user is bounced out of the internal workspace"
 
 echo
+echo "Navigation reachability — every link in the shell must resolve"
+echo "-------------------------------------------"
+# A 404 behind a nav item is the first thing a reviewer finds, and it reads as
+# unfinished work regardless of what is behind the other links.
+for route in /workspace /workspace/quotations /workspace/approvals /workspace/health; do
+  check "$(status mgr "$route")" "200" "Manager can open $route"
+done
+check "$(status rep /workspace/quotations/new)" "200" "Rep can open the new-quotation form"
+check "$(status rep /workspace/approvals)" "307" "Rep is redirected away from the approval queue"
+
+echo
 echo "Privilege separation inside the admin area"
 echo "-------------------------------------------"
 login "manager@dealflow.test" mgr2 > /dev/null
