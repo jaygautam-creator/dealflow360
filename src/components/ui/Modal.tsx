@@ -26,13 +26,71 @@ export function Modal({
   const descriptionId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Focus, scroll lock and Escape, all torn down together.
+   *
+   * The dialog had correct ARIA but no focus management, which made it correct for a
+   * screen reader and broken for a keyboard. `aria-modal` hides the background from
+   * assistive technology, but it does nothing to the tab order: opening "Add product" and
+   * pressing Tab moved focus behind the overlay, so a keyboard user typed into a form they
+   * could not see. Every admin screen uses this component, so it was every admin screen.
+   */
   useEffect(() => {
     if (!open) return;
+
+    // Remembered so focus can go back where it came from. Losing focus to <body> on close
+    // means the next Tab restarts from the top of the document.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const FOCUSABLE =
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    const focusables = () =>
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
+        (el) => el.offsetParent !== null,
+      );
+
+    // The first field, not the dialog itself: a form you have to Tab into once more before
+    // typing is a small tax paid on every single open.
+    const first = focusables()[0];
+    (first ?? dialogRef.current)?.focus();
+
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      // Cycle within the dialog. Without this, Tab walks out into the page behind.
+      const items = focusables();
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && (active === firstItem || !dialogRef.current?.contains(active))) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && active === lastItem) {
+        event.preventDefault();
+        firstItem.focus();
+      }
     }
+
+    // The page behind scrolled under the overlay, which reads as the dialog drifting.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -46,6 +104,7 @@ export function Modal({
     >
       <div
         ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
