@@ -14,8 +14,8 @@ export const metadata = { title: "Deal health — DealFlow360" };
 export const dynamic = "force-dynamic";
 
 export default async function HealthPage() {
-  await requirePermissionPage(P.DASHBOARD_VIEW, "/workspace/health");
-  const report = await buildHealthReport();
+  const user = await requirePermissionPage(P.DASHBOARD_VIEW, "/workspace/health");
+  const report = await buildHealthReport(user);
 
   return (
     <div className="space-y-6">

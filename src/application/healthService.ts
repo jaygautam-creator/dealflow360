@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/infrastructure/db";
 import { dbToPct } from "@/infrastructure/money";
 import { checkStalled, checkDiscountAnomaly, checkDeliverySlippage } from "@/domain/health/dealHealth";
+import { scopedQuotationWhere } from "./queries";
+import type { SessionUser } from "@/infrastructure/auth/session";
 
 /**
  * Deal health.
@@ -33,10 +35,12 @@ export interface HealthReport {
   byOwner: { ownerName: string; count: number; value: number; averageDiscount: number }[];
 }
 
-export async function buildHealthReport(now = new Date()): Promise<HealthReport> {
+export async function buildHealthReport(user: SessionUser, now = new Date()): Promise<HealthReport> {
+  const quotationScope = scopedQuotationWhere(user);
   const [config, quotations, backorderRows] = await Promise.all([
     prisma.riskConfig.findUnique({ where: { id: "singleton" } }),
     prisma.quotation.findMany({
+      where: quotationScope,
       include: {
         customer: { select: { name: true } },
         owner: { select: { id: true, name: true } },
@@ -46,7 +50,10 @@ export async function buildHealthReport(now = new Date()): Promise<HealthReport>
       orderBy: { lastActivityAt: "desc" },
     }),
     prisma.fulfillmentAllocation.findMany({
-      where: { isBackorder: true },
+      where: {
+        isBackorder: true,
+        plan: { salesOrder: { quotation: quotationScope } },
+      },
       include: { product: true, plan: { include: { salesOrder: true } } },
     }),
   ]);
@@ -125,7 +132,9 @@ export async function buildHealthReport(now = new Date()): Promise<HealthReport>
     ownerGroups.set(q.owner.name, g);
   }
 
-  const upsellAccepted = await prisma.quotationLine.count({ where: { fromUpsell: true } });
+  const upsellAccepted = await prisma.quotationLine.count({
+    where: { fromUpsell: true, quotation: quotationScope },
+  });
 
   return {
     config: { stalledAfterDays, anomalyZThreshold, anomalyMinSamples },

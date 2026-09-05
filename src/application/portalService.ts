@@ -296,7 +296,9 @@ export async function sendToCustomer(
   const quotation = await prisma.quotation.findUniqueOrThrow({ where: { id: quotationId } });
   assertCanMutateQuotation(actor, quotation);
 
-  if (quotation.status !== "APPROVED" && quotation.status !== "DRAFT") {
+  // Publishing is a post-approval transition. Allowing DRAFT here would let an owner
+  // sidestep the approval chain by publishing first and confirming from SENT.
+  if (quotation.status !== "APPROVED") {
     throw new DomainError(`A quotation in ${quotation.status} state cannot be sent.`);
   }
   const pending = await prisma.approvalStep.count({ where: { quotationId, status: "PENDING" } });
