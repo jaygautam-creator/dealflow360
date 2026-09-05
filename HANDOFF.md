@@ -26,8 +26,8 @@ npm run dev                           # http://localhost:3000
 ```
 
 ```bash
-npm test              # 125 unit tests, ~1s
-npm run verify        # 61 live assertions against the running server
+npm test              # 153 unit tests, ~0.5s
+npm run verify        # 62 live assertions against the running server
 npx tsc --noEmit      # typecheck
 npm run build         # NEVER while `npm run dev` is running — it rewrites .next underneath it
 psql -d dealflow360   # a reviewer can query anything directly
@@ -70,7 +70,7 @@ src/components/      UI            Presentational component library.
 src/proxy.ts         Pipeline      Path-to-permission enforcement before a route renders.
 ```
 
-`src/domain` importing nothing is what makes 125 tests run in a second with no database
+`src/domain` importing nothing is what makes 153 tests run in half a second with no database
 and no mocks — and it is the honest answer to "did you really implement these rules?"
 
 **Non-negotiable conventions:**
@@ -90,10 +90,10 @@ and no mocks — and it is the honest answer to "did you really implement these 
 
 | Gate | Result |
 |---|---|
-| Unit tests | 125 |
-| Live access assertions | 28 |
+| Unit tests | 153 |
+| Live access assertions | 29 |
 | Live lifecycle assertions | 33 |
-| Production build | 18/18 pages clean |
+| Production build | clean |
 
 **Built:** six domain engines (blended risk scoring, approval routing, greedy set-cover
 warehouse split, hybrid billing + proration, per-rep z-score anomaly detection, upsell
@@ -101,7 +101,10 @@ ranking) · full schema + seed · auth, RBAC matrix, request-pipeline path guard
 / approval / confirmation / portal / payment / health services · the whole admin config
 area (9 screens) · pipeline board, quotations table, quotation builder with live risk
 trace, approval queue, deal-health dashboard, orders / invoices / subscriptions lists ·
-customer portal with negotiation · `docs/{ARCHITECTURE,REVIEWER_QA,DEMO_SCRIPT,ROADMAP}.md`.
+customer portal with negotiation · reports with filters and CSV/XLS export · manual
+fulfilment override and backorder consolidation · subscription modify / cancel with
+credit notes · signup, workspace top-bar actions, upsell dismiss, deal-health nudge ·
+`docs/{ARCHITECTURE,REVIEWER_QA,DEMO_SCRIPT,ROADMAP}.md`.
 
 **Verification scripts are the demo.** `scripts/verify-flow.sh` walks the problem
 statement's own Section 9 test flow; it reseeds itself and holds a lock, so it is
@@ -113,18 +116,14 @@ deterministic from any starting state.
 
 Everything below is a genuine gap against the problem statement, not polish.
 
-1. **Reports page with filters and export** (spec A7) — Period / Sales Team / Approval
-   Status / Product Category filters, plus PDF and XLS export. Nothing exists yet. This is
-   the largest remaining spec gap.
-2. **Manual override of the warehouse split** (spec B6) — the planner suggests a split and
-   the UI shows it, but "Manual Override" is not implemented. `FULFILLMENT_OVERRIDE`
-   permission and the `isManualOverride` column already exist.
-3. **Backorder consolidation prompt** (spec B6) — `findConsolidationOpportunity` exists and
-   is tested in `src/domain/fulfillment/planner.ts`; nothing calls it.
-4. **Subscription modify / cancel with credit note** (spec B7) — `prorateChange` and
-   `prorateCancellation` are written and tested; no endpoint or UI reaches them.
-5. **Product variants in the quotation builder** — the schema and pricing support them,
-   the builder does not offer them.
+1. **Product variants in the quotation builder** — the schema (`ProductVariant`), the
+   admin screen and the `POST /api/quotations/[id]/lines` route all support variants
+   already; `QuotationBuilder.tsx` never offers the choice. The last real spec gap
+   (A2 reaching B3).
+
+Everything else that was on this list — reports with filters and export (A7), manual
+warehouse override (B6), backorder consolidation (B6), and subscription modify / cancel
+with credit notes (B7) — is now built and reachable from the UI.
 
 ---
 
