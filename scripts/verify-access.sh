@@ -66,14 +66,29 @@ echo
 echo "Role scoping — a rep sees only their own quotations"
 echo "---------------------------------------------------"
 login "manager@dealflow.test" mgr > /dev/null
-REP_VIEW=$(page rep /workspace)
-MGR_VIEW=$(page mgr /workspace)
 
-check "$(seen "$REP_VIEW" 'Beta Industries')" "yes" "Rep sees the customer they own"
-check "$(seen "$REP_VIEW" 'Cygnus Ltd')"      "no"  "Rep CANNOT see another rep's customer"
-check "$(seen "$REP_VIEW" 'Vikram Rao')"      "no"  "Rep CANNOT see another rep's deals"
-check "$(seen "$MGR_VIEW" 'Beta Industries')" "yes" "Manager sees the first rep's deals"
-check "$(seen "$MGR_VIEW" 'Cygnus Ltd')"      "yes" "Manager sees the second rep's deals"
+# Asserted through the quotations search rather than the pipeline board. The board caps
+# how many cards it renders per lane, so on a large dataset an absent name would prove
+# only that the card was off-screen — the weakest possible version of a scoping test.
+# Search runs AFTER the caller's scope filter is applied, so a hit means the row was
+# genuinely visible to them and a miss means it genuinely was not.
+# The results page echoes the search term back in its own heading, so grepping the HTML
+# for the customer name would match even on zero results — an assertion that passes
+# whether or not scoping works. The empty-state marker is the honest signal: it appears
+# only when the scoped query actually returned nothing.
+found_as() { # found_as <jar> <url-encoded query>  -> yes | no
+  if grep -q 'Nothing matches' <<<"$(page "$1" "/workspace/quotations?q=$2")"; then
+    echo no
+  else
+    echo yes
+  fi
+}
+
+check "$(found_as rep 'Beta%20Industries')" "yes" "Rep sees the customer they own"
+check "$(found_as rep 'Cygnus%20Ltd')"      "no"  "Rep CANNOT see another rep's customer"
+check "$(seen "$(page rep /workspace/quotations)" 'Vikram Rao')" "no" "Rep CANNOT see another rep's deals"
+check "$(found_as mgr 'Beta%20Industries')" "yes" "Manager sees the first rep's deals"
+check "$(found_as mgr 'Cygnus%20Ltd')"      "yes" "Manager sees the second rep's deals"
 
 echo
 echo "Portal tenancy — a customer is confined to their own portal"

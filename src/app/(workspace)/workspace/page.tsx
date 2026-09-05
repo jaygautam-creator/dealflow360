@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { listQuotations } from "@/application/queries";
+import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -25,9 +26,16 @@ const STAGES: { key: QuotationStatus[]; label: string; tone: BadgeTone }[] = [
   { key: ["REJECTED", "CANCELLED"], label: "Closed", tone: "danger" },
 ];
 
+/** Cards rendered per lane before the board defers to the quotations table. */
+const CARDS_PER_LANE = 12;
+
 export default async function PipelinePage() {
   const user = await requireUserPage("/workspace");
   const quotations = await listQuotations(user);
+
+  // Finance approves and bills; it does not raise quotations. Rendering the button to a
+  // role whose guard will refuse it is how a permission boundary reads as a broken feature.
+  const canCreate = can(user.role, P.QUOTATION_CREATE);
 
   const totalValue = quotations
     .filter((q) => q.status === "CONFIRMED")
@@ -42,12 +50,14 @@ export default async function PipelinePage() {
         title="Pipeline"
         subtitle={`${quotations.length} quotation${quotations.length === 1 ? "" : "s"} in view`}
         actions={
-          <Link href="/workspace/quotations/new">
-            <Button>
-              <Plus className="size-4" />
-              New quotation
-            </Button>
-          </Link>
+          canCreate ? (
+            <Link href="/workspace/quotations/new">
+              <Button>
+                <Plus className="size-4" />
+                New quotation
+              </Button>
+            </Link>
+          ) : null
         }
       />
 
@@ -68,6 +78,12 @@ export default async function PipelinePage() {
           <div className="flex min-w-max gap-4">
             {STAGES.map((stage) => {
               const inStage = quotations.filter((q) => stage.key.includes(q.status));
+              // A board is for triage, not for storage. Rendering every card in a lane
+              // put 400 DOM nodes on the page and made the column unscrollable in
+              // practice; the count badge above already carries the true total, so the
+              // lane shows the newest few and says how many it is standing in for.
+              const shown = inStage.slice(0, CARDS_PER_LANE);
+              const hidden = inStage.length - shown.length;
               return (
                 <section key={stage.label} className="flex w-64 shrink-0 flex-col rounded-xl bg-neutral-100/70 p-2">
                   <div className="flex items-center justify-between px-1.5 pb-2 pt-1">
@@ -80,7 +96,7 @@ export default async function PipelinePage() {
                   </div>
 
                   <div className="space-y-2">
-                    {inStage.map((q) => (
+                    {shown.map((q) => (
                       <Link key={q.id} href={`/workspace/quotations/${q.id}`} className="block">
                         <Card className="flex h-[132px] flex-col justify-between transition hover:border-indigo-300 hover:shadow-sm dark:hover:border-indigo-700">
                           <CardContent className="flex flex-1 flex-col justify-between gap-2 p-3">
@@ -115,6 +131,14 @@ export default async function PipelinePage() {
                     ))}
                     {/* An empty lane is information, not a problem, so it whispers rather
                         than drawing a full-size dashed box the eye keeps returning to. */}
+                    {hidden > 0 ? (
+                      <Link
+                        href={`/workspace/quotations`}
+                        className="block px-1.5 py-2 text-xs font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                      >
+                        + {hidden} more in this stage
+                      </Link>
+                    ) : null}
                     {inStage.length === 0 ? (
                       <p className="px-1.5 py-3 text-xs text-neutral-400">Nothing here</p>
                     ) : null}

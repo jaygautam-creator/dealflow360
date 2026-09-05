@@ -39,12 +39,20 @@ export default async function ApprovalsPage() {
     orderBy: { riskScore: "desc" },
   });
 
-  const myLevel = can(user.role, P.APPROVE_AS_FINANCE) ? "FINANCE" : "SALES_MANAGER";
+  // Asked per step, not resolved to a single "my level" up front. An ADMIN holds both
+  // APPROVE_AS_FINANCE and APPROVE_AS_MANAGER, so a ternary picking one of them silently
+  // dropped every manager-level item out of "Waiting on you" — the queue looked empty
+  // while work was genuinely outstanding on that person.
+  const canApproveAt = (level: string) =>
+    level === "FINANCE"
+      ? can(user.role, P.APPROVE_AS_FINANCE)
+      : can(user.role, P.APPROVE_AS_MANAGER);
 
   // Only the earliest pending step is actionable, and never on your own quotation.
-  const actionable = pending.filter(
-    (q) => q.approvalSteps[0]?.level === myLevel && q.ownerId !== user.id,
-  );
+  const actionable = pending.filter((q) => {
+    const step = q.approvalSteps[0];
+    return step !== undefined && canApproveAt(step.level) && q.ownerId !== user.id;
+  });
   const others = pending.filter((q) => !actionable.includes(q));
 
   return (

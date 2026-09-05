@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { listQuotations } from "@/application/queries";
+import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -10,6 +11,9 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 export const metadata = { title: "Quotations" };
 export const dynamic = "force-dynamic";
+
+/** Rows rendered before the table asks the reader to search instead. */
+const ROWS_SHOWN = 50;
 
 /**
  * The table counterpart to the pipeline board. The board answers "where is everything
@@ -23,6 +27,7 @@ export default async function QuotationsPage({
   const user = await requireUserPage("/workspace/quotations");
   const q = ((await searchParams).q ?? "").trim();
   const all = await listQuotations(user);
+  const canCreate = can(user.role, P.QUOTATION_CREATE);
 
   // Filtered after the scoped query rather than inside it: listQuotations already applies
   // the caller's tenancy filter, so search can only ever narrow what they were entitled to
@@ -36,6 +41,11 @@ export default async function QuotationsPage({
           item.customer.name.toLowerCase().includes(needle),
       )
     : all;
+  // The subtitle and every count keep reporting the true total; only the rendered rows are
+  // capped. Search already exists as the narrowing tool, so the table does not need
+  // pagination state — it needs to stop putting four hundred rows in the DOM.
+  const visible = quotations.slice(0, ROWS_SHOWN);
+  const hiddenCount = quotations.length - visible.length;
 
   return (
     <div className="space-y-6">
@@ -43,9 +53,11 @@ export default async function QuotationsPage({
         title="Quotations"
         subtitle={q ? `${quotations.length} matching “${q}”` : `${quotations.length} in view`}
         actions={
-          <Link href="/workspace/quotations/new">
-            <Button><Plus className="size-4" />New quotation</Button>
-          </Link>
+          canCreate ? (
+            <Link href="/workspace/quotations/new">
+              <Button><Plus className="size-4" />New quotation</Button>
+            </Link>
+          ) : null
         }
       />
 
@@ -71,7 +83,7 @@ export default async function QuotationsPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {quotations.map((q) => (
+                  {visible.map((q) => (
                     <tr key={q.id} className="transition hover:bg-neutral-50">
                       <td className="px-4 py-3">
                         <Link href={`/workspace/quotations/${q.id}`} className="font-mono text-xs font-medium text-indigo-600 hover:underline">
@@ -102,6 +114,11 @@ export default async function QuotationsPage({
                 </tbody>
               </table>
             </div>
+            {hiddenCount > 0 ? (
+              <p className="border-t border-neutral-100 px-4 py-3 text-xs text-neutral-500">
+                Showing {visible.length} of {quotations.length}. Use search to narrow.
+              </p>
+            ) : null}
           </CardContent>
         </Card>
       )}
