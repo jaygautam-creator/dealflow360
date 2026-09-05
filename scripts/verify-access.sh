@@ -87,11 +87,15 @@ echo "Navigation reachability — every link in the shell must resolve"
 echo "-------------------------------------------"
 # A 404 behind a nav item is the first thing a reviewer finds, and it reads as
 # unfinished work regardless of what is behind the other links.
-for route in /workspace /workspace/quotations /workspace/approvals /workspace/health; do
+for route in /workspace /workspace/quotations /workspace/approvals /workspace/health /workspace/orders /workspace/orders/subscriptions; do
   check "$(status mgr "$route")" "200" "Manager can open $route"
 done
 check "$(status rep /workspace/quotations/new)" "200" "Rep can open the new-quotation form"
 check "$(status rep /workspace/approvals)" "307" "Rep is redirected away from the approval queue"
+
+login "finance@dealflow.test" fin > /dev/null
+check "$(status fin /workspace/orders/invoices)" "200" "Finance can open /workspace/orders/invoices"
+check "$(status mgr /workspace/orders/invoices)" "307" "Manager is refused invoices (BILLING_MANAGE is Finance-only)"
 
 echo
 echo "Privilege separation inside the admin area"

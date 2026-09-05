@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, CheckSquare, Activity, Settings } from "lucide-react";
+import { LayoutDashboard, FileText, CheckSquare, Activity, Settings, Package, Receipt, Repeat } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
@@ -31,6 +31,24 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
       href: "/workspace/health",
       icon: <Activity className="size-4" />,
       show: can(user.role, P.DASHBOARD_VIEW),
+    },
+    {
+      label: "Orders",
+      href: "/workspace/orders",
+      icon: <Package className="size-4" />,
+      show: can(user.role, P.FULFILLMENT_VIEW),
+    },
+    {
+      label: "Invoices",
+      href: "/workspace/orders/invoices",
+      icon: <Receipt className="size-4" />,
+      show: can(user.role, P.BILLING_MANAGE),
+    },
+    {
+      label: "Subscriptions",
+      href: "/workspace/orders/subscriptions",
+      icon: <Repeat className="size-4" />,
+      show: can(user.role, P.FULFILLMENT_VIEW),
     },
     {
       label: "Configuration",
