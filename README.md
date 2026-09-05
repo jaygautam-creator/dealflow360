@@ -21,11 +21,21 @@ than a static PDF.
 No Docker, no build step to configure, one process.
 
 ```bash
+brew services start postgresql@16   # or however you run Postgres
+createdb dealflow360
+
 npm install
-cp .env.example .env.local     # then fill in DATABASE_URL
-npm run db:migrate             # create the schema
-npm run db:seed                # load the demo dataset
-npm run dev                    # http://localhost:3000
+cp .env.example .env.local          # set YOUR_USER and AUTH_SECRET
+npm run db:migrate                  # create the schema
+npm run db:seed                     # load the demo dataset
+npm run dev                         # http://localhost:3000
+```
+
+Everything runs on your own machine — local Postgres, local Next.js, no hosting account
+and no network dependency. The database is yours to inspect:
+
+```bash
+psql -d dealflow360
 ```
 
 ```bash
@@ -145,4 +155,6 @@ Full detail, with diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
 | **Tailwind CSS v4** + a hand-built component library | No black-box UI dependency | A component framework whose internals I would have to defend |
 | **Hand-built auth** (`jose` + `bcryptjs`) | RBAC and portal tenancy are graded parts of this problem | Clerk/Auth0 — outsources the thing being assessed |
 | **Vitest**, domain layer only | Pure functions, so tests assert business rules directly | E2E tests that prove the UI rather than the logic |
+| **No charting library** | One bar chart is 40 lines of SVG in a Server Component, shipping no JavaScript | recharts — a large dependency and an API to learn for one chart |
+| **No date library** | Billing month-end is a business decision to state, not inherit | date-fns — see `src/domain/shared/dates.ts` |
 | **No Docker** | `npm install && npm run dev`. Nothing to build or trust | A container adding a layer with no benefit here |
