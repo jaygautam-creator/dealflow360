@@ -114,7 +114,14 @@ deterministic from any starting state.
 ### Demo sequencing
 
 - `npm run verify:flow` reseeds the database as its first action and wipes bulk data.
-- Run `npm run db:seed:bulk` **after** `verify:flow`, never before.
+- `npm run demo:scale` — the scalability exhibit, in the only order that works. It resets
+  first, loads the bulk data, then measures the pages signed in as the manager.
+- `npm run demo:reset` — back to the demo starting state. Use this rather than
+  `db:seed` alone: the seed script does not manage every table, so a month-end promotion
+  configured while rehearsing survives a plain reseed and silently changes what the panel
+  does. `demo:reset` clears it and prints proof that the database is clean.
+- Both verify scripts refuse to run against a dead server now, with one clear line instead
+  of a cascade of assertion failures that look like a real regression.
 - `npm run verify:access` does **not** reseed, so it can run safely against either seed state without clearing bulk records.
 
 ---

@@ -30,6 +30,20 @@ echo "pid $$ started $(date '+%H:%M:%S')" > "$LOCKDIR/owner"
 cleanup() { rm -rf "$LOCKDIR"; }
 trap cleanup EXIT INT TERM
 
+# ── Preflight: is the server actually up? ────────────────────────────────────
+# Without this, a dead dev server produces a cascade of assertion failures that
+# look exactly like a real regression — step 1 fails, everything after it fails
+# because it depends on step 1, and the run ends "5 passed, 28 failed". That has
+# cost real debugging time. One clear line beats twenty-eight misleading ones.
+if ! curl -s -o /dev/null --max-time 5 "$BASE/login"; then
+  echo
+  echo "  The server at $BASE is not responding."
+  echo "  Start it with:  npm run dev"
+  echo "  (If it was running, it has died — check the terminal you started it in.)"
+  echo
+  exit 3
+fi
+
 JAR=$(mktemp -d)
 PASS=0
 FAIL=0
