@@ -227,7 +227,7 @@ export async function rescoreAfterEdit(
   quotationId: string,
   previousScore: number,
   actorId: string,
-): Promise<{ reapprovalRequired: boolean; reason: string; riskScore: number }> {
+): Promise<{ reapprovalRequired: boolean; reason: string; riskScore: number; recalc: RecalculationResult }> {
   const recalc = await recalculateQuotation(tx, quotationId);
   const rules = await loadApprovalRules(tx);
   const verdict = requiresReapproval(previousScore, recalc.riskScore, rules);
@@ -250,7 +250,15 @@ export async function rescoreAfterEdit(
     }
   }
 
-  return { reapprovalRequired: verdict.required, reason: verdict.reason, riskScore: recalc.riskScore };
+  // The recalculation is returned rather than discarded: callers need these totals, and
+  // recomputing them would mean a second full pass over the quotation inside the same
+  // transaction — wasted round trips against a remote database.
+  return {
+    reapprovalRequired: verdict.required,
+    reason: verdict.reason,
+    riskScore: recalc.riskScore,
+    recalc,
+  };
 }
 
 export interface AuditInput {

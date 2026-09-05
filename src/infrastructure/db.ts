@@ -24,6 +24,14 @@ function createPrismaClient(): PrismaClient {
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    transactionOptions: {
+      // Prisma's 5s default assumes a database on the same machine. This one is a hosted
+      // Postgres several hundred milliseconds away, and confirming an order legitimately
+      // performs a dozen sequential statements. The budget is raised to match reality
+      // rather than splitting the work into transactions that could half-apply.
+      timeout: 20_000,
+      maxWait: 10_000,
+    },
   });
 }
 

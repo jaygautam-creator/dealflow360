@@ -15,7 +15,10 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verify:access": "./scripts/verify-access.sh",
+    "verify:flow": "./scripts/verify-flow.sh",
+    "verify": "./scripts/verify-access.sh && ./scripts/verify-flow.sh"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
