@@ -64,8 +64,19 @@ async function main() {
   // ── Governance configuration ────────────────────────────────────────────────
   console.log("Seeding governance configuration...");
 
-  await prisma.riskConfig.create({
-    data: {
+  // Upserted rather than created. The row is a singleton with a fixed id, so anything
+  // touching it between the delete above and this write would otherwise crash the seed on
+  // a unique-constraint violation — which is exactly what happens when two people reseed
+  // a shared database at once.
+  await prisma.riskConfig.upsert({
+    where: { id: "singleton" },
+    update: {
+      aggregateAmplifier: 1.5,
+      stalledAfterDays: 5,
+      anomalyZThreshold: 2.0,
+      anomalyMinSamples: 3,
+    },
+    create: {
       id: "singleton",
       aggregateAmplifier: 1.5,
       stalledAfterDays: 5,

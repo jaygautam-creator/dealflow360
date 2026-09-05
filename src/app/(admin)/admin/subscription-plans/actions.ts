@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { BillingInterval } from "@/generated/prisma";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../_lib/authGuard";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -22,6 +23,9 @@ function parse(formData: FormData) {
 }
 
 export async function createSubscriptionPlan(formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -30,6 +34,9 @@ export async function createSubscriptionPlan(formData: FormData) {
 }
 
 export async function updateSubscriptionPlan(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -38,6 +45,9 @@ export async function updateSubscriptionPlan(id: string, formData: FormData) {
 }
 
 export async function deleteSubscriptionPlan(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const productCount = await prisma.product.count({ where: { defaultPlanId: id } });
   if (productCount > 0) {
     return { error: `Cannot delete: ${productCount} product(s) default to this plan.` };

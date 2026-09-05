@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../../_lib/authGuard";
 
 const schema = z.object({
   productId: z.string().min(1, "Product is required"),
@@ -18,6 +19,9 @@ function parse(formData: FormData) {
 
 // priceListId is bound as the leading argument from the detail page.
 export async function createPriceListItem(priceListId: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -31,6 +35,9 @@ export async function createPriceListItem(priceListId: string, formData: FormDat
 }
 
 export async function updatePriceListItem(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -42,6 +49,9 @@ export async function updatePriceListItem(id: string, formData: FormData) {
 }
 
 export async function deletePriceListItem(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const item = await prisma.priceListItem.delete({ where: { id } });
   revalidatePath(`/admin/price-lists/${item.priceListId}`);
 }

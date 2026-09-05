@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigWrite } from "../_lib/authGuard";
 
 const schema = z.object({
   aggregateAmplifier: z.coerce.number().min(0),
@@ -12,6 +13,9 @@ const schema = z.object({
 });
 
 export async function updateRiskConfig(formData: FormData) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   const parsed = schema.safeParse({
     aggregateAmplifier: formData.get("aggregateAmplifier"),
     stalledAfterDays: formData.get("stalledAfterDays"),

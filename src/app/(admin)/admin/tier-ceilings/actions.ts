@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CustomerTier } from "@/generated/prisma";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigWrite } from "../_lib/authGuard";
 
 const schema = z.object({
   tier: z.enum(CustomerTier),
@@ -20,6 +21,9 @@ function parse(formData: FormData) {
 // Ceilings are one row per tier (tier is @unique), so create/update both resolve to an
 // upsert keyed on tier — there is no independent id the form needs to track.
 export async function createTierCeiling(formData: FormData) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -32,6 +36,9 @@ export async function createTierCeiling(formData: FormData) {
 }
 
 export async function updateTierCeiling(id: string, formData: FormData) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -43,6 +50,9 @@ export async function updateTierCeiling(id: string, formData: FormData) {
 }
 
 export async function deleteTierCeiling(id: string) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   await prisma.tierDiscountCeiling.delete({ where: { id } });
   revalidatePath("/admin/tier-ceilings");
 }

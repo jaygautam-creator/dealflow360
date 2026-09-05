@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../_lib/authGuard";
 
 const schema = z
   .object({
@@ -26,6 +27,9 @@ function parse(formData: FormData) {
 }
 
 export async function createUpsellRule(formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -44,6 +48,9 @@ export async function createUpsellRule(formData: FormData) {
 }
 
 export async function updateUpsellRule(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -52,6 +59,9 @@ export async function updateUpsellRule(id: string, formData: FormData) {
 }
 
 export async function deleteUpsellRule(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   await prisma.upsellRule.delete({ where: { id } });
   revalidatePath("/admin/upsell-rules");
 }

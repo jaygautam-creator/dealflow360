@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../_lib/authGuard";
 
 const categorySchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
@@ -18,6 +19,9 @@ function parse(formData: FormData) {
 }
 
 export async function createCategory(formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -26,6 +30,9 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function updateCategory(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -34,6 +41,9 @@ export async function updateCategory(id: string, formData: FormData) {
 }
 
 export async function deleteCategory(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const productCount = await prisma.product.count({ where: { categoryId: id } });
   if (productCount > 0) {
     return { error: `Cannot delete: ${productCount} product(s) still use this category.` };

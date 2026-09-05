@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../../_lib/authGuard";
 
 const schema = z.object({
   productId: z.string().min(1, "Product is required"),
@@ -21,6 +22,9 @@ function parse(formData: FormData) {
 // warehouseId is bound as the leading argument from the detail page, matching the
 // EntityManager (formData) => ... / (id, formData) => ... action signatures.
 export async function createStockLevel(warehouseId: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -34,6 +38,9 @@ export async function createStockLevel(warehouseId: string, formData: FormData) 
 }
 
 export async function updateStockLevel(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -45,6 +52,9 @@ export async function updateStockLevel(id: string, formData: FormData) {
 }
 
 export async function deleteStockLevel(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const stockLevel = await prisma.stockLevel.delete({ where: { id } });
   revalidatePath(`/admin/warehouses/${stockLevel.warehouseId}`);
 }

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../../_lib/authGuard";
 
 const schema = z.object({
   attribute: z.string().trim().min(1, "Attribute is required"),
@@ -20,6 +21,9 @@ function parse(formData: FormData) {
 
 // productId is bound as the leading argument from the detail page.
 export async function createVariant(productId: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -39,6 +43,9 @@ export async function createVariant(productId: string, formData: FormData) {
 }
 
 export async function updateVariant(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -50,6 +57,9 @@ export async function updateVariant(id: string, formData: FormData) {
 }
 
 export async function deleteVariant(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const variant = await prisma.productVariant.delete({ where: { id } });
   revalidatePath(`/admin/products/${variant.productId}`);
 }

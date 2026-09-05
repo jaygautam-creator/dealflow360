@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigWrite } from "../_lib/authGuard";
 
 const ruleSchema = z
   .object({
@@ -41,6 +42,9 @@ function toData(parsed: z.infer<typeof ruleSchema>) {
 }
 
 export async function createApprovalRule(formData: FormData) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -49,6 +53,9 @@ export async function createApprovalRule(formData: FormData) {
 }
 
 export async function updateApprovalRule(id: string, formData: FormData) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -57,6 +64,9 @@ export async function updateApprovalRule(id: string, formData: FormData) {
 }
 
 export async function deleteApprovalRule(id: string) {
+  const guardError = await guardConfigWrite();
+  if (guardError) return guardError;
+
   await prisma.approvalRule.delete({ where: { id } });
   revalidatePath("/admin/approval-rules");
 }

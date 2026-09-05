@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ProductKind } from "@/generated/prisma";
 import { prisma } from "@/infrastructure/db";
+import { guardConfigManage } from "../_lib/authGuard";
 
 const schema = z.object({
   sku: z.string().trim().min(1, "SKU is required"),
@@ -55,6 +56,9 @@ function toData(parsed: z.infer<typeof schema>) {
 }
 
 export async function createProduct(formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -63,6 +67,9 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(id: string, formData: FormData) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -72,6 +79,9 @@ export async function updateProduct(id: string, formData: FormData) {
 }
 
 export async function deleteProduct(id: string) {
+  const guardError = await guardConfigManage();
+  if (guardError) return guardError;
+
   const lineCount = await prisma.quotationLine.count({ where: { productId: id } });
   if (lineCount > 0) {
     return { error: `Cannot delete: ${lineCount} quotation line(s) reference this product.` };
