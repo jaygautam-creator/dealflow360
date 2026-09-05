@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ProductKind } from "@/generated/prisma";
 import { prisma } from "@/infrastructure/db";
 import { guardConfigManage } from "../_lib/authGuard";
+import { requireUserApi } from "@/infrastructure/auth/guards";
 
 const schema = z.object({
   sku: z.string().trim().min(1, "SKU is required"),
@@ -58,22 +59,54 @@ function toData(parsed: z.infer<typeof schema>) {
 export async function createProduct(formData: FormData) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.product.create({ data: toData(parsed.data) });
+  const data = toData(parsed.data);
+  await prisma.$transaction(async (tx) => {
+    const product = await tx.product.create({ data });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "Product",
+        entityId: product.id,
+        action: "PRODUCT_CREATED",
+        actorId: user.id,
+        reason: `Created product "${product.name}" (${product.sku})`,
+        payload: data,
+      },
+    });
+  });
+
   revalidatePath("/admin/products");
 }
 
 export async function updateProduct(id: string, formData: FormData) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.product.update({ where: { id }, data: toData(parsed.data) });
+  const data = toData(parsed.data);
+  await prisma.$transaction(async (tx) => {
+    const product = await tx.product.update({ where: { id }, data });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "Product",
+        entityId: id,
+        action: "PRODUCT_UPDATED",
+        actorId: user.id,
+        reason: `Updated product "${product.name}" (${product.sku})`,
+        payload: data,
+      },
+    });
+  });
+
   revalidatePath("/admin/products");
   revalidatePath(`/admin/products/${id}`);
 }
@@ -81,11 +114,25 @@ export async function updateProduct(id: string, formData: FormData) {
 export async function deleteProduct(id: string) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const lineCount = await prisma.quotationLine.count({ where: { productId: id } });
   if (lineCount > 0) {
     return { error: `Cannot delete: ${lineCount} quotation line(s) reference this product.` };
   }
-  await prisma.product.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const product = await tx.product.delete({ where: { id } });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "Product",
+        entityId: id,
+        action: "PRODUCT_DELETED",
+        actorId: user.id,
+        reason: `Deleted product "${product.name}" (${product.sku})`,
+      },
+    });
+  });
+
   revalidatePath("/admin/products");
 }

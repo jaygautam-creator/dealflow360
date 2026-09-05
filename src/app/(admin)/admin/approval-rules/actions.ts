@@ -51,17 +51,19 @@ export async function createApprovalRule(formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const data = toData(parsed.data);
-  const rule = await prisma.approvalRule.create({ data });
+  await prisma.$transaction(async (tx) => {
+    const rule = await tx.approvalRule.create({ data });
 
-  await prisma.auditEvent.create({
-    data: {
-      entityType: "ApprovalRule",
-      entityId: rule.id,
-      action: "CREATED",
-      actorId: user.id,
-      reason: `Created approval rule "${rule.name}"`,
-      payload: data,
-    },
+    await tx.auditEvent.create({
+      data: {
+        entityType: "ApprovalRule",
+        entityId: rule.id,
+        action: "CREATED",
+        actorId: user.id,
+        reason: `Created approval rule "${rule.name}"`,
+        payload: data,
+      },
+    });
   });
 
   revalidatePath("/admin/approval-rules");
@@ -76,17 +78,19 @@ export async function updateApprovalRule(id: string, formData: FormData) {
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
   const data = toData(parsed.data);
-  await prisma.approvalRule.update({ where: { id }, data });
+  await prisma.$transaction(async (tx) => {
+    await tx.approvalRule.update({ where: { id }, data });
 
-  await prisma.auditEvent.create({
-    data: {
-      entityType: "ApprovalRule",
-      entityId: id,
-      action: "UPDATED",
-      actorId: user.id,
-      reason: `Updated approval rule "${data.name}"`,
-      payload: data,
-    },
+    await tx.auditEvent.create({
+      data: {
+        entityType: "ApprovalRule",
+        entityId: id,
+        action: "UPDATED",
+        actorId: user.id,
+        reason: `Updated approval rule "${data.name}"`,
+        payload: data,
+      },
+    });
   });
 
   revalidatePath("/admin/approval-rules");
@@ -97,16 +101,18 @@ export async function deleteApprovalRule(id: string) {
   if (guardError) return guardError;
   const user = await requireUserApi();
 
-  const deleted = await prisma.approvalRule.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const deleted = await tx.approvalRule.delete({ where: { id } });
 
-  await prisma.auditEvent.create({
-    data: {
-      entityType: "ApprovalRule",
-      entityId: id,
-      action: "DELETED",
-      actorId: user.id,
-      reason: `Deleted approval rule "${deleted.name}"`,
-    },
+    await tx.auditEvent.create({
+      data: {
+        entityType: "ApprovalRule",
+        entityId: id,
+        action: "DELETED",
+        actorId: user.id,
+        reason: `Deleted approval rule "${deleted.name}"`,
+      },
+    });
   });
 
   revalidatePath("/admin/approval-rules");

@@ -26,21 +26,23 @@ export async function updateRiskConfig(formData: FormData) {
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.riskConfig.upsert({
-    where: { id: "singleton" },
-    create: { id: "singleton", ...parsed.data },
-    update: parsed.data,
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.riskConfig.upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", ...parsed.data },
+      update: parsed.data,
+    });
 
-  await prisma.auditEvent.create({
-    data: {
-      entityType: "RiskConfig",
-      entityId: "singleton",
-      action: "UPDATED",
-      actorId: user.id,
-      reason: "Updated system risk parameters and anomaly thresholds",
-      payload: parsed.data,
-    },
+    await tx.auditEvent.create({
+      data: {
+        entityType: "RiskConfig",
+        entityId: "singleton",
+        action: "UPDATED",
+        actorId: user.id,
+        reason: "Updated system risk parameters and anomaly thresholds",
+        payload: parsed.data,
+      },
+    });
   });
 
   revalidatePath("/admin/risk-config");

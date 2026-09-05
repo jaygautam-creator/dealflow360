@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
 import { guardConfigManage } from "../_lib/authGuard";
+import { requireUserApi } from "@/infrastructure/auth/guards";
 
 const schema = z
   .object({
@@ -29,6 +30,7 @@ function parse(formData: FormData) {
 export async function createUpsellRule(formData: FormData) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -43,25 +45,68 @@ export async function createUpsellRule(formData: FormData) {
   });
   if (existing) return { error: "A rule for this product pair already exists." };
 
-  await prisma.upsellRule.create({ data: parsed.data });
+  await prisma.$transaction(async (tx) => {
+    const rule = await tx.upsellRule.create({ data: parsed.data });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "UpsellRule",
+        entityId: rule.id,
+        action: "UPSELL_RULE_CREATED",
+        actorId: user.id,
+        reason: `Created upsell rule (co-purchase score: ${parsed.data.coPurchaseScore}, min margin: ${parsed.data.minMarginPct}%)`,
+        payload: parsed.data,
+      },
+    });
+  });
+
   revalidatePath("/admin/upsell-rules");
 }
 
 export async function updateUpsellRule(id: string, formData: FormData) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.upsellRule.update({ where: { id }, data: parsed.data });
+  await prisma.$transaction(async (tx) => {
+    await tx.upsellRule.update({ where: { id }, data: parsed.data });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "UpsellRule",
+        entityId: id,
+        action: "UPSELL_RULE_UPDATED",
+        actorId: user.id,
+        reason: `Updated upsell rule (co-purchase score: ${parsed.data.coPurchaseScore}, min margin: ${parsed.data.minMarginPct}%)`,
+        payload: parsed.data,
+      },
+    });
+  });
+
   revalidatePath("/admin/upsell-rules");
 }
 
 export async function deleteUpsellRule(id: string) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
-  await prisma.upsellRule.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    await tx.upsellRule.delete({ where: { id } });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "UpsellRule",
+        entityId: id,
+        action: "UPSELL_RULE_DELETED",
+        actorId: user.id,
+        reason: `Deleted upsell rule`,
+      },
+    });
+  });
+
   revalidatePath("/admin/upsell-rules");
 }

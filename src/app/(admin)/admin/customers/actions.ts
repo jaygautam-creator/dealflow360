@@ -112,6 +112,7 @@ export async function updateCustomer(id: string, formData: FormData) {
 export async function deleteCustomer(id: string) {
   const guardError = await guardConfigManage();
   if (guardError) return guardError;
+  const actor = await requireUserApi();
 
   // Block deletion if quotations exist — they hold references to this customer and
   // removing it would orphan financial records.
@@ -131,6 +132,20 @@ export async function deleteCustomer(id: string) {
     };
   }
 
-  await prisma.customer.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.delete({ where: { id } });
+
+    await tx.auditEvent.create({
+      data: {
+        entityType: "Customer",
+        entityId: id,
+        action: "CUSTOMER_DELETED",
+        actorId: actor.id,
+        reason: `Deleted customer "${customer.name}"`,
+        payload: { name: customer.name, email: customer.email, tier: customer.tier },
+      },
+    });
+  });
+
   revalidatePath("/admin/customers");
 }
