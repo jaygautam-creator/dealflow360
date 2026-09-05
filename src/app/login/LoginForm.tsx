@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -80,6 +81,13 @@ export function LoginForm({ next }: { next?: string }) {
           Sign in
         </Button>
       </form>
+
+      <p className="mt-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
+          Create an account
+        </Link>
+      </p>
 
       <div className="mt-8">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">

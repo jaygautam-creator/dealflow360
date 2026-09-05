@@ -82,10 +82,13 @@ export default async function PipelinePage() {
                       <Card className="transition hover:border-indigo-300 hover:shadow-sm dark:hover:border-indigo-700">
                         <CardContent className="space-y-2 p-3">
                           <div className="flex items-start justify-between gap-2">
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                            <span
+                              className="min-w-0 truncate text-sm font-medium text-neutral-900 dark:text-neutral-100"
+                              title={q.customer.name}
+                            >
                               {q.customer.name}
                             </span>
-                            <Badge tone={q.customer.tier === "GOLD" ? "warning" : "neutral"}>
+                            <Badge className="shrink-0" tone={q.customer.tier === "GOLD" ? "warning" : "neutral"}>
                               {q.customer.tier}
                             </Badge>
                           </div>

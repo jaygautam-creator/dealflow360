@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Send } from "lucide-react";
+import { MessageSquare, Send, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -61,6 +61,27 @@ export function PortalQuotation({
     } finally { setBusy(false); }
   }
 
+  async function confirmTerms() {
+    if (!window.confirm("Do you accept these quotation terms and wish to confirm the order?")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/portal/quotations/${quotation.id}/confirm`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Could not confirm quotation.");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch {
+      setError("Could not reach the server.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -68,20 +89,32 @@ export function PortalQuotation({
           <h1 className="font-mono text-xl font-semibold text-neutral-900 dark:text-neutral-50">
             {quotation.number}
           </h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 break-words text-sm text-neutral-500">
             Your contact: {quotation.repName} · {quotation.repEmail}
           </p>
         </div>
-        <Badge tone={confirmed ? "success" : quotation.status === "UNDER_NEGOTIATION" ? "warning" : "info"}>
-          {confirmed ? "Confirmed" : quotation.status === "UNDER_NEGOTIATION" ? "In discussion" : "Awaiting your review"}
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone={confirmed ? "success" : quotation.status === "UNDER_NEGOTIATION" ? "warning" : "info"}>
+            {confirmed ? "Confirmed" : quotation.status === "UNDER_NEGOTIATION" ? "In discussion" : "Awaiting your review"}
+          </Badge>
+          {!confirmed && (quotation.status === "SENT" || quotation.status === "UNDER_NEGOTIATION") ? (
+            <Button
+              loading={working}
+              onClick={() => void confirmTerms()}
+              className="bg-emerald-600 hover:bg-emerald-500 focus-visible:outline-emerald-600 text-white"
+            >
+              <CheckCircle className="size-4" />
+              Confirm quotation
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <Card>
         <CardHeader><CardTitle>What you are quoted for</CardTitle></CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[620px] text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800">
                   <th className="pb-2 pr-3 font-medium">Item</th>
@@ -105,7 +138,7 @@ export function PortalQuotation({
                           type="button"
                           onClick={() => setLineId(lineId === l.id ? null : l.id)}
                           className={`mt-1 text-xs underline-offset-2 hover:underline ${
-                            lineId === l.id ? "font-medium text-indigo-600 dark:text-indigo-400" : "text-neutral-400"}`}
+                            lineId === l.id ? "font-medium text-teal-700 dark:text-teal-400" : "text-neutral-400"}`}
                         >
                           {lineId === l.id ? "asking about this item" : "ask about this item"}
                         </button>
@@ -137,9 +170,9 @@ export function PortalQuotation({
           <CardHeader><CardTitle>Order {quotation.order.number}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {quotation.order.invoices.map((i) => (
-              <div key={i.number} className="flex items-center justify-between text-sm">
-                <span className="font-mono text-xs text-neutral-500">{i.number}</span>
-                <span className="flex items-center gap-2">
+              <div key={i.number} className="flex items-center justify-between gap-3 text-sm">
+                <span className="min-w-0 break-all font-mono text-xs text-neutral-500">{i.number}</span>
+                <span className="flex shrink-0 items-center gap-2">
                   <Badge tone={i.type === "RECURRING" ? "info" : "neutral"}>
                     {i.type === "RECURRING" ? "subscription" : "one-time"}
                   </Badge>
@@ -167,16 +200,16 @@ export function PortalQuotation({
                 <li key={m.id} className={`flex ${m.fromCustomer ? "justify-end" : "justify-start"}`}>
                   <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                     m.fromCustomer
-                      ? "bg-indigo-600 text-white"
+                      ? "bg-teal-600 text-white"
                       : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100"}`}>
                     <p className="whitespace-pre-wrap">{m.body}</p>
                     {m.requestedDiscountPct !== null ? (
-                      <p className={`mt-1 text-xs ${m.fromCustomer ? "text-indigo-100" : "text-neutral-500"}`}>
+                      <p className={`mt-1 text-xs ${m.fromCustomer ? "text-teal-100" : "text-neutral-500"}`}>
                         Requested {m.requestedDiscountPct}% ·{" "}
                         {m.status === "ACCEPTED" ? "accepted" : m.status === "DECLINED" ? "declined" : "awaiting a response"}
                       </p>
                     ) : null}
-                    <p className={`mt-1 text-xs ${m.fromCustomer ? "text-indigo-200" : "text-neutral-400"}`}>
+                    <p className={`mt-1 text-xs ${m.fromCustomer ? "text-teal-200" : "text-neutral-400"}`}>
                       {m.authorName} · {new Date(m.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
                     </p>
                   </div>
@@ -193,7 +226,7 @@ export function PortalQuotation({
                 </p>
               ) : null}
               {lineId ? (
-                <p className="text-xs text-indigo-600 dark:text-indigo-400">
+                <p className="text-xs text-teal-700 dark:text-teal-400">
                   Your message is attached to a specific item.{" "}
                   <button type="button" onClick={() => setLineId(null)} className="underline">
                     ask about the whole quotation instead
@@ -219,7 +252,11 @@ export function PortalQuotation({
                   containerClassName="w-56"
                   hint="Your sales contact reviews this before anything changes."
                 />
-                <Button loading={working} onClick={() => void send()}>
+                <Button
+                  loading={working}
+                  onClick={() => void send()}
+                  className="bg-teal-600 hover:bg-teal-500 focus-visible:outline-teal-600 disabled:bg-teal-300"
+                >
                   <Send className="size-4" />
                   Send
                 </Button>

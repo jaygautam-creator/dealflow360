@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { prisma } from "@/infrastructure/db";
 import { scopedQuotationWhere } from "@/application/queries";
+import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import type { SessionUser } from "@/infrastructure/auth/session";
 import type { Prisma, QuotationStatus } from "@/generated/prisma";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
@@ -50,32 +51,37 @@ export function parseReportFilters(raw: Record<string, string | undefined>): Rep
   });
 }
 
-function periodRange(filters: ReportFilters): { gte: Date; lte: Date } | null {
+/**
+ * Period ranges are half-open — `gte` start, `lt` end. Using `lte` against the first
+ * instant of the next period counts a quotation created exactly at midnight on the
+ * boundary in both periods, so two adjacent reports would not sum to the whole.
+ */
+function periodRange(filters: ReportFilters): { gte: Date; lt: Date } | null {
   const now = new Date();
   if (filters.period === "today") {
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-    return { gte: start, lte: end };
+    return { gte: start, lt: end };
   }
   if (filters.period === "week") {
     // Monday-start week.
     const day = (now.getDay() + 6) % 7;
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
     const end = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
-    return { gte: start, lte: end };
+    return { gte: start, lt: end };
   }
   if (filters.period === "month") {
     const start = new Date(now.getFullYear(), now.getMonth(), 1);
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return { gte: start, lte: end };
+    return { gte: start, lt: end };
   }
   // custom
   if (!filters.from && !filters.to) return null;
   const gte = filters.from ? new Date(filters.from) : new Date(0);
   const toDate = filters.to ? new Date(filters.to) : now;
   // Inclusive of the whole "to" day.
-  const lte = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate() + 1);
-  return { gte, lte };
+  const lt = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate() + 1);
+  return { gte, lt };
 }
 
 function approvalStatusWhere(filters: ReportFilters): Prisma.QuotationWhereInput {
@@ -104,6 +110,9 @@ export interface ReportRow {
   status: QuotationStatus;
   riskScore: number;
   discountPct: number;
+  /** Kept alongside the percentage so aggregates can be value-weighted rather than a mean of means. */
+  subtotalPaise: number;
+  discountPaise: number;
   totalPaise: number;
   createdAt: Date;
 }
@@ -150,6 +159,8 @@ export async function runReport(user: SessionUser, filters: ReportFilters): Prom
       status: q.status,
       riskScore: dbToPct(q.riskScore),
       discountPct: subtotalPaise > 0 ? Math.round((discountPaise / subtotalPaise) * 10000) / 100 : 0,
+      subtotalPaise,
+      discountPaise,
       totalPaise: dbToPaise(q.total),
       createdAt: q.createdAt,
     };
@@ -157,7 +168,13 @@ export async function runReport(user: SessionUser, filters: ReportFilters): Prom
 
   const count = rows.length;
   const totalValuePaise = rows.reduce((s, r) => s + r.totalPaise, 0);
-  const averageDiscountPct = count === 0 ? 0 : rows.reduce((s, r) => s + r.discountPct, 0) / count;
+  // Value-weighted, not a mean of the per-quotation percentages. A mean would let a
+  // 90%-off sample order weigh exactly as much as a crore-rupee deal at 2%, which
+  // reports a discount posture the business does not actually have. The honest figure
+  // is total rupees discounted over total rupees quoted.
+  const grossPaise = rows.reduce((s, r) => s + r.subtotalPaise, 0);
+  const discountedPaise = rows.reduce((s, r) => s + r.discountPaise, 0);
+  const averageDiscountPct = grossPaise === 0 ? 0 : (discountedPaise / grossPaise) * 100;
   const averageRiskScore = count === 0 ? 0 : rows.reduce((s, r) => s + r.riskScore, 0) / count;
   const decided = rows.filter((r) => APPROVED_STATUSES.includes(r.status) || REJECTED_STATUSES.includes(r.status));
   const approvalRatePct =
@@ -175,13 +192,33 @@ export async function runReport(user: SessionUser, filters: ReportFilters): Prom
   };
 }
 
-/** Sales reps for the filter dropdown — anyone who can own a quotation. */
-export async function listSalesReps() {
+/**
+ * Sales reps for the filter dropdown, scoped to what the caller may see.
+ *
+ * `canFilterByRep` below hides the control, but hiding a control is presentation, not
+ * access control — the same rule this codebase applies to navigation links. A rep who
+ * calls this function anyway gets themselves and nobody else, so the roster is never
+ * disclosed by a screen that merely forgot to check.
+ */
+export async function listSalesReps(user: SessionUser) {
+  if (!can(user.role, P.QUOTATION_READ_ALL)) {
+    const self = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, name: true } });
+    return self ? [self] : [];
+  }
   return prisma.user.findMany({
-    where: { role: { in: ["SALES_REP", "SALES_MANAGER"] }, isActive: true },
+    where: { role: { not: "PORTAL" }, isActive: true },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
+}
+
+/**
+ * A rep's own quotations are already the entire result set (`scopedQuotationWhere` sees
+ * to that), so a rep-filter dropdown offering colleagues' names would just be a control
+ * that lies about what it does. Only show it to a principal who can actually see everyone.
+ */
+export function canFilterByRep(user: SessionUser): boolean {
+  return can(user.role, P.QUOTATION_READ_ALL);
 }
 
 export async function listCategories() {

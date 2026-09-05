@@ -10,6 +10,7 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { findConsolidationOpportunity } from "@/domain/fulfillment/planner";
+import { ConsolidateBackorderButton } from "./ConsolidateBackorderButton";
 import type { OrderStatus } from "@/generated/prisma";
 
 export const metadata = { title: "Orders" };
@@ -124,9 +125,11 @@ export default async function OrdersPage() {
                           <div className="space-y-1">
                             <Badge tone="danger">Backorder</Badge>
                             {consolidation && (
-                              <p className="text-xs font-medium text-indigo-600" title={`${consolidation.warehouseName} can now cover every backordered line on this order.`}>
-                                Consolidate Remaining Backorder — {consolidation.warehouseName}
-                              </p>
+                              <ConsolidateBackorderButton
+                                orderId={order.id}
+                                warehouseId={consolidation.warehouseId}
+                                warehouseName={consolidation.warehouseName}
+                              />
                             )}
                           </div>
                         ) : (

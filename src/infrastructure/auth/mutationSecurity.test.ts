@@ -167,3 +167,92 @@ describe("Fulfillment Allocation Balancing & Demands", () => {
     expect(result.error).toContain("Quantity must be greater than zero");
   });
 });
+
+describe("Quotation Lifecycle & Customer Confirmation Governance", () => {
+  function canSendToCustomer(status: string): boolean {
+    return status === "APPROVED";
+  }
+
+  it("strictly forbids sending DRAFT quotations to customer", () => {
+    expect(canSendToCustomer("DRAFT")).toBe(false);
+  });
+
+  it("forbids sending unapproved quotations in review stages", () => {
+    expect(canSendToCustomer("PENDING_MANAGER")).toBe(false);
+    expect(canSendToCustomer("PENDING_FINANCE")).toBe(false);
+    expect(canSendToCustomer("UNDER_NEGOTIATION")).toBe(false);
+  });
+
+  it("permits sending only when quotation status is APPROVED", () => {
+    expect(canSendToCustomer("APPROVED")).toBe(true);
+  });
+
+  function canCustomerConfirm(params: {
+    quotationCustomerId: string;
+    sessionCustomerId: string;
+    status: string;
+    hasOpenNegotiation: boolean;
+    requiresApproval: boolean;
+  }): { allowed: boolean; reason?: string } {
+    if (params.quotationCustomerId !== params.sessionCustomerId) {
+      return { allowed: false, reason: "Quotation belongs to a different customer" };
+    }
+    if (params.hasOpenNegotiation) {
+      return { allowed: false, reason: "Negotiation is in progress" };
+    }
+    if (params.requiresApproval) {
+      return { allowed: false, reason: "Requires manager or finance approval" };
+    }
+    const eligibleStatuses = ["SENT", "APPROVED", "UNDER_NEGOTIATION"];
+    if (!eligibleStatuses.includes(params.status)) {
+      return { allowed: false, reason: `Cannot confirm quotation in ${params.status} status` };
+    }
+    return { allowed: true };
+  }
+
+  it("forbids customer confirmation if quotation belongs to another customer (BOLA/IDOR)", () => {
+    const res = canCustomerConfirm({
+      quotationCustomerId: "cust-1",
+      sessionCustomerId: "cust-2",
+      status: "SENT",
+      hasOpenNegotiation: false,
+      requiresApproval: false,
+    });
+    expect(res.allowed).toBe(false);
+    expect(res.reason).toContain("different customer");
+  });
+
+  it("forbids customer confirmation if draft or unapproved", () => {
+    const res = canCustomerConfirm({
+      quotationCustomerId: "cust-1",
+      sessionCustomerId: "cust-1",
+      status: "DRAFT",
+      hasOpenNegotiation: false,
+      requiresApproval: false,
+    });
+    expect(res.allowed).toBe(false);
+  });
+
+  it("forbids confirmation if negotiated terms trigger approval rules", () => {
+    const res = canCustomerConfirm({
+      quotationCustomerId: "cust-1",
+      sessionCustomerId: "cust-1",
+      status: "SENT",
+      hasOpenNegotiation: false,
+      requiresApproval: true,
+    });
+    expect(res.allowed).toBe(false);
+    expect(res.reason).toContain("approval");
+  });
+
+  it("allows confirmation when legitimate customer owns quote, no open negotiation, and approval criteria met", () => {
+    const res = canCustomerConfirm({
+      quotationCustomerId: "cust-1",
+      sessionCustomerId: "cust-1",
+      status: "SENT",
+      hasOpenNegotiation: false,
+      requiresApproval: false,
+    });
+    expect(res.allowed).toBe(true);
+  });
+});

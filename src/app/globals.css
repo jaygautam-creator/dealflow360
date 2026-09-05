@@ -42,6 +42,7 @@ body {
   /* Slightly tighter than default: this UI is dense, and the extra line height reads as
      sloppiness in a table of figures. */
   line-height: 1.5;
+  overflow-x: hidden;
 }
 
 /* The application ground. Named rather than a raw neutral so the shell, the page
@@ -72,5 +73,28 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  /* The browser's own print engine produces the PDF, so we ship no PDF library. Hide the
+     shell chrome and let the report fill the page. */
+  aside, nav, header, .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+  thead {
+    display: table-header-group;
   }
 }

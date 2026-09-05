@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt } from "lucide-react";
+import { Plus, Trash2, Sparkles, ShieldCheck, Package, Receipt, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -53,6 +53,10 @@ export function QuotationBuilder({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState(initialSuggestions);
+  // Dismissing an upsell suggestion is a per-session UI preference, not a business fact —
+  // nothing downstream (pricing, approvals, audit) needs to know a rep hid a card, so it
+  // lives only in client state rather than as a database column or an API call.
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [newProductId, setNewProductId] = useState(products[0]?.id ?? "");
   const [newQty, setNewQty] = useState(1);
   const [newDiscount, setNewDiscount] = useState(0);
@@ -105,7 +109,7 @@ export function QuotationBuilder({
             <CardHeader><CardTitle>Lines</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800">
                       <th className="pb-2 pr-3 font-medium">Product</th>
@@ -186,13 +190,20 @@ export function QuotationBuilder({
                 </div>
               ) : null}
 
-              <dl className="ml-auto max-w-xs space-y-1 border-t border-neutral-200 pt-4 text-sm dark:border-neutral-800">
+              <dl className="ml-auto max-w-xs space-y-1.5 border-t border-neutral-200 pt-4 text-sm dark:border-neutral-800">
                 <Row label="Subtotal" value={money(quotation.subtotal)} />
                 <Row label="Discount" value={`− ${money(quotation.discountTotal)}`} />
                 <Row label="Tax" value={money(quotation.taxTotal)} />
                 <Row label="Total" value={money(quotation.total)} strong />
-                <Row label="Margin" value={`${quotation.marginPct}%`} />
               </dl>
+              {/* The live margin is one of the two numbers this demo turns on — it earns its
+                  own callout rather than blending into the totals list above. */}
+              <div className="ml-auto flex max-w-xs items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-900 dark:bg-indigo-950/30">
+                <span className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">Margin</span>
+                <span className="text-2xl font-bold tabular-nums leading-none text-indigo-700 dark:text-indigo-300">
+                  {quotation.marginPct}%
+                </span>
+              </div>
             </CardContent>
           </Card>
 
@@ -210,7 +221,7 @@ export function QuotationBuilder({
                 <p className="text-sm text-neutral-500">No approval required at the current score.</p>
               ) : quotation.approvalSteps.map((s) => (
                 <div key={s.id} className="flex items-start justify-between gap-2 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-medium text-neutral-900 dark:text-neutral-100">
                       {s.level === "SALES_MANAGER" ? "Sales Manager" : "Finance"}
                     </div>
@@ -247,6 +258,22 @@ export function QuotationBuilder({
                     }}>Return</Button>
                   </>
                 ) : null}
+                {editable && quotation.status === "APPROVED" && !locked ? (
+                  <Button
+                    variant="secondary"
+                    loading={working}
+                    onClick={() =>
+                      void call(
+                        `/api/quotations/${quotation.id}/send`,
+                        { method: "POST" },
+                        "Quotation published to the customer portal.",
+                      )
+                    }
+                  >
+                    <Send className="size-4" />
+                    Send to customer
+                  </Button>
+                ) : null}
                 {permissions.mayConfirm && quotation.status === "APPROVED" && !locked ? (
                   <Button loading={working} onClick={() => void call(`/api/quotations/${quotation.id}/confirm`, { method: "POST" }, "Order confirmed.")}>
                     Confirm order
@@ -262,11 +289,11 @@ export function QuotationBuilder({
                 <CardTitle className="flex items-center gap-2"><Sparkles className="size-4" />Suggested add-ons</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {suggestions.map((s) => (
+                {suggestions.filter((s) => !dismissed.has(s.productId)).map((s) => (
                   <div key={s.ruleId} className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
                     <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 break-words text-sm font-medium text-neutral-900 dark:text-neutral-100">
                           {s.productName}
                           {s.isPromoted ? <Badge tone="warning">promoted</Badge> : null}
                         </div>
@@ -274,18 +301,31 @@ export function QuotationBuilder({
                       </div>
                       <span className="shrink-0 text-sm tabular-nums">{money(s.listPricePaise / 100)}</span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className={`text-xs tabular-nums ${s.marginDeltaPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         margin {s.marginDeltaPct >= 0 ? "+" : ""}{s.marginDeltaPct}pp
                       </span>
-                      <Button size="sm" variant="secondary" loading={working}
-                        onClick={() => void call(`/api/quotations/${quotation.id}/lines`, {
-                          method: "POST",
-                          body: JSON.stringify({ productId: s.productId, quantity: 1, discountPct: 0, fromUpsell: true }),
-                        })}>Add to quote</Button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <Button size="sm" variant="ghost"
+                          onClick={() => setDismissed((prev) => new Set(prev).add(s.productId))}>Dismiss</Button>
+                        <Button size="sm" variant="secondary" loading={working}
+                          onClick={() => void call(`/api/quotations/${quotation.id}/lines`, {
+                            method: "POST",
+                            body: JSON.stringify({ productId: s.productId, quantity: 1, discountPct: 0, fromUpsell: true }),
+                          })}>Add to quote</Button>
+                      </div>
                     </div>
                   </div>
                 ))}
+                {dismissed.size > 0 ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+                    onClick={() => setDismissed(new Set())}
+                  >
+                    Show {dismissed.size} dismissed
+                  </button>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}
@@ -308,8 +348,8 @@ function OrderPanel({ order }: { order: NonNullable<Parameters<typeof QuotationB
             {order.shipmentCount === 1 ? " — the whole order ships from one warehouse." : " — no single warehouse could cover the order."}
           </p>
           {order.allocations.map((a) => (
-            <div key={a.id} className="flex items-center justify-between text-sm">
-              <span className="text-neutral-800 dark:text-neutral-200">{a.productName}</span>
+            <div key={a.id} className="flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0 break-words text-neutral-800 dark:text-neutral-200">{a.productName}</span>
               <span className="flex items-center gap-2 text-neutral-500">
                 <span className="tabular-nums">{a.quantity}</span>
                 {a.isBackorder ? <Badge tone="warning">backorder</Badge> : <Badge tone="neutral">{a.warehouseName}</Badge>}
@@ -323,8 +363,8 @@ function OrderPanel({ order }: { order: NonNullable<Parameters<typeof QuotationB
         <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="size-4" />Billing</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {order.invoices.map((i) => (
-            <div key={i.id} className="flex items-center justify-between text-sm">
-              <div>
+            <div key={i.id} className="flex items-center justify-between gap-3 text-sm">
+              <div className="min-w-0">
                 <span className="font-mono text-xs text-neutral-500">{i.number}</span>
                 <div className="flex items-center gap-2">
                   <Badge tone={i.type === "RECURRING" ? "info" : "neutral"}>{i.type === "RECURRING" ? "recurring" : "one-time"}</Badge>
@@ -360,7 +400,7 @@ function AuditPanel({ audit }: { audit: { id: string; action: string; reason: st
         <ol className="space-y-2">
           {audit.slice(0, 12).map((a) => (
             <li key={a.id} className="flex items-baseline justify-between gap-3 text-sm">
-              <div>
+              <div className="min-w-0">
                 <span className="font-medium text-neutral-900 dark:text-neutral-100">{a.action.replaceAll("_", " ").toLowerCase()}</span>
                 {a.reason ? <span className="text-neutral-500"> — {a.reason}</span> : null}
               </div>

@@ -1,5 +1,5 @@
 import { requirePermissionPage } from "@/infrastructure/auth/guards";
-import { PERMISSIONS as P } from "@/infrastructure/auth/rbac";
+import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { scopedQuotationWhere } from "@/application/queries";
 import { prisma } from "@/infrastructure/db";
 import { dbToPaise } from "@/infrastructure/money";
@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import type { ScheduleStatus } from "@/generated/prisma";
+import { SubscriptionActions } from "./SubscriptionActions";
 
 export const metadata = { title: "Subscriptions" };
 export const dynamic = "force-dynamic";
@@ -24,11 +25,13 @@ export default async function SubscriptionsPage() {
     where: { salesOrder: { quotation: scopedQuotationWhere(user) } },
     include: {
       salesOrder: { select: { quotation: { select: { customer: { select: { name: true } } } } } },
-      line: { select: { product: { select: { name: true } } } },
+      line: { select: { quantity: true, product: { select: { name: true } } } },
       plan: { select: { name: true } },
     },
     orderBy: { nextBillingDate: "asc" },
   });
+
+  const mayManageBilling = can(user.role, P.BILLING_MANAGE);
 
   return (
     <div className="space-y-6">
@@ -55,6 +58,7 @@ export default async function SubscriptionsPage() {
                   <TH className="text-right">Per period</TH>
                   <TH>Next billing</TH>
                   <TH>Status</TH>
+                  <TH className="text-right">Action</TH>
                 </TR>
               </THead>
               <TBody>
@@ -74,6 +78,17 @@ export default async function SubscriptionsPage() {
                     </TD>
                     <TD>
                       <Badge tone={scheduleStatusTone(s.status)}>{s.status.toLowerCase()}</Badge>
+                    </TD>
+                    <TD className="text-right">
+                      {s.status === "ACTIVE" && mayManageBilling ? (
+                        <SubscriptionActions
+                          scheduleId={s.id}
+                          currentQuantity={s.line.quantity}
+                          productName={s.line.product.name}
+                        />
+                      ) : (
+                        <span className="text-xs text-neutral-400">—</span>
+                      )}
                     </TD>
                   </TR>
                 ))}

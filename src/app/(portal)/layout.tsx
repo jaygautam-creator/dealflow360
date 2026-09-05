@@ -20,19 +20,21 @@ export default async function PortalLayout({ children }: { children: React.React
   if (user.role !== "PORTAL") redirect("/workspace");
 
   return (
-    <div className="min-h-dvh bg-neutral-50 dark:bg-neutral-950">
-      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+    // The portal borrows nothing from the workspace's indigo — teal marks it, at a glance,
+    // as a different surface for a different audience, not just the same app with no sidebar.
+    <div className="min-h-dvh bg-teal-50/40 dark:bg-neutral-950">
+      <header className="border-b border-teal-100 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <Link href="/portal" className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-600 text-xs font-bold text-white">
               DF
             </div>
-            <span className="text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-              DealFlow360
+            <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+              Acme Corp Portal
             </span>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-neutral-600 dark:text-neutral-400">{user.name}</span>
+            <span className="hidden text-sm text-neutral-600 sm:inline dark:text-neutral-400">{user.name}</span>
             <LogoutButton />
           </div>
         </div>

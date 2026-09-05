@@ -7,7 +7,7 @@ export function Card({ className, ...props }: CardProps) {
   return (
     <div
       className={cn(
-        "rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900",
+        "rounded-xl border border-[var(--color-hairline)] bg-surface shadow-sm dark:border-neutral-800 dark:bg-neutral-900",
         className
       )}
       {...props}
@@ -21,7 +21,7 @@ export function CardHeader({ className, ...props }: CardHeaderProps) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800",
+        "flex flex-wrap items-start justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-4 dark:border-neutral-800",
         className
       )}
       {...props}
@@ -35,7 +35,7 @@ export function CardTitle({ className, ...props }: CardTitleProps) {
   return (
     <h3
       className={cn(
-        "text-sm font-semibold text-neutral-900 dark:text-neutral-100",
+        "text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-100",
         className
       )}
       {...props}

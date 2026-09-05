@@ -106,7 +106,7 @@ export async function buildHealthReport(user: SessionUser, now = new Date()): Pr
       });
     }
 
-    const slip = checkDeliverySlippage(q.promisedDate, q.validUntil);
+    const slip = checkDeliverySlippage(q.promisedDate, now);
     if (slip.isSlipping) {
       slipping.push({ id: q.id, number: q.number, customerName: q.customer.name, daysLate: slip.daysLate, explanation: slip.explanation });
     }

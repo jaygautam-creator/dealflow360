@@ -5,6 +5,7 @@ import {
   APPROVAL_STATUS_VALUES,
   PERIOD_VALUES,
   approvalStatusLabel,
+  canFilterByRep,
   listCategories,
   listSalesReps,
   parseReportFilters,
@@ -20,6 +21,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { PrintButton } from "./PrintButton";
 import type { QuotationStatus } from "@/generated/prisma";
 
 export const metadata = { title: "Reports" };
@@ -33,10 +35,11 @@ export default async function ReportsPage({
   const user = await requirePermissionPage(P.DASHBOARD_VIEW, "/workspace/reports");
   const raw = await searchParams;
   const filters = parseReportFilters(raw);
+  const showRepFilter = canFilterByRep(user);
 
   const [{ rows, summary }, reps, categories] = await Promise.all([
     runReport(user, filters),
-    listSalesReps(),
+    listSalesReps(user),
     listCategories(),
   ]);
 
@@ -46,7 +49,7 @@ export default async function ReportsPage({
     <div className="space-y-6">
       <PageHeader title="Reports" subtitle={`${summary.count} quotation${summary.count === 1 ? "" : "s"} matching filters`} />
 
-      <Card>
+      <Card className="no-print">
         <CardContent>
           <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5" method="get">
             <Select label="Period" name="period" defaultValue={filters.period}>
@@ -58,14 +61,16 @@ export default async function ReportsPage({
             </Select>
             <Input label="From" type="date" name="from" defaultValue={filters.from ?? ""} />
             <Input label="To" type="date" name="to" defaultValue={filters.to ?? ""} />
-            <Select label="Sales rep" name="repId" defaultValue={filters.repId ?? ""}>
-              <option value="">All reps</option>
-              {reps.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </Select>
+            {showRepFilter && (
+              <Select label="Sales rep" name="repId" defaultValue={filters.repId ?? ""}>
+                <option value="">All reps</option>
+                {reps.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </Select>
+            )}
             <Select label="Approval status" name="approvalStatus" defaultValue={filters.approvalStatus}>
               {APPROVAL_STATUS_VALUES.map((s) => (
                 <option key={s} value={s}>
@@ -88,7 +93,7 @@ export default async function ReportsPage({
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatTile label="Quotations" value={String(summary.count)} />
         <StatTile label="Total value" value={money(summary.totalValuePaise)} />
         <StatTile label="Avg. discount" value={`${summary.averageDiscountPct.toFixed(1)}%`} />
@@ -96,9 +101,9 @@ export default async function ReportsPage({
         <StatTile label="Approval rate" value={`${summary.approvalRatePct.toFixed(1)}%`} />
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-medium text-neutral-700">Results</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <a
             href={`/api/reports/export?${qs}&format=csv`}
             className="inline-flex h-8 items-center justify-center rounded-md border border-neutral-300 bg-white px-3 text-sm font-medium text-neutral-900 hover:bg-neutral-50"
@@ -111,6 +116,7 @@ export default async function ReportsPage({
           >
             Export XLS
           </a>
+          <PrintButton />
         </div>
       </div>
 

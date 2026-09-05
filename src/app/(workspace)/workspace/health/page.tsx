@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Clock, PackageX, TrendingUp } from "lucide-react";
+import { AlertTriangle, Calendar, Clock, PackageX, TrendingUp } from "lucide-react";
 import { requirePermissionPage } from "@/infrastructure/auth/guards";
 import { PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { buildHealthReport } from "@/application/healthService";
@@ -9,6 +9,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PipelineChart } from "./PipelineChart";
+import { NudgeButton } from "./NudgeButton";
 
 export const metadata = { title: "Deal health — DealFlow360" };
 export const dynamic = "force-dynamic";
@@ -53,8 +54,8 @@ export default async function HealthPage() {
             ) : (
               <ul className="space-y-3">
                 {report.anomalies.map((a) => (
-                  <li key={a.id}>
-                    <Link href={`/workspace/quotations/${a.id}`} className="block rounded-lg border border-red-200 bg-red-50/50 p-3 transition hover:border-red-300 dark:border-red-900 dark:bg-red-950/20">
+                  <li key={a.id} className="flex gap-2 rounded-lg border border-red-200 bg-red-50/50 p-3 transition hover:border-red-300 dark:border-red-900 dark:bg-red-950/20">
+                    <Link href={`/workspace/quotations/${a.id}`} className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <span className="font-mono text-xs text-neutral-500">{a.number}</span>
@@ -66,6 +67,7 @@ export default async function HealthPage() {
                       </div>
                       <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">{a.explanation}</p>
                     </Link>
+                    <NudgeButton quotationId={a.id} />
                   </li>
                 ))}
               </ul>
@@ -90,8 +92,8 @@ export default async function HealthPage() {
             ) : (
               <ul className="space-y-2">
                 {report.stalled.map((s) => (
-                  <li key={s.id}>
-                    <Link href={`/workspace/quotations/${s.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 p-3 transition hover:border-amber-300 dark:border-neutral-800">
+                  <li key={s.id} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 transition hover:border-amber-300 dark:border-neutral-800">
+                    <Link href={`/workspace/quotations/${s.id}`} className="min-w-0 flex-1">
                       <div>
                         <span className="font-mono text-xs text-neutral-500">{s.number}</span>
                         <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
@@ -99,8 +101,49 @@ export default async function HealthPage() {
                         </div>
                         <p className="text-xs text-neutral-500">{s.ownerName} · {money(s.total)}</p>
                       </div>
-                      <Badge tone="warning">{s.daysInactive}d idle</Badge>
                     </Link>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <Badge tone="warning">{s.daysInactive}d idle</Badge>
+                      <NudgeButton quotationId={s.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="size-4" />
+              Delivery promise slippage
+              {report.slipping.length > 0 ? <Badge tone="warning">{report.slipping.length}</Badge> : null}
+            </CardTitle>
+            <p className="mt-1 text-xs text-neutral-500">
+              Open quotations where the promised delivery date has elapsed or is at risk.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {report.slipping.length === 0 ? (
+              <p className="text-sm text-neutral-500">Every active delivery promise is currently on schedule.</p>
+            ) : (
+              <ul className="space-y-2">
+                {report.slipping.map((s) => (
+                  <li key={s.id} className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 transition hover:border-amber-300 dark:border-neutral-800">
+                    <Link href={`/workspace/quotations/${s.id}`} className="min-w-0 flex-1">
+                      <div>
+                        <span className="font-mono text-xs text-neutral-500">{s.number}</span>
+                        <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                          {s.customerName}
+                        </div>
+                        <p className="text-xs text-neutral-500">{s.explanation}</p>
+                      </div>
+                    </Link>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <Badge tone="danger">{s.daysLate}d late</Badge>
+                      <NudgeButton quotationId={s.id} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -119,8 +162,8 @@ export default async function HealthPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><TrendingUp className="size-4" />By sales rep</CardTitle>
           </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
+          <CardContent className="overflow-x-auto">
+            <table className="w-full min-w-max text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800">
                   <th className="pb-2 font-medium">Rep</th>
@@ -152,8 +195,8 @@ export default async function HealthPage() {
           <CardContent>
             <ul className="space-y-1">
               {report.backorders.map((b, i) => (
-                <li key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-neutral-800 dark:text-neutral-200">
+                <li key={i} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 break-words text-neutral-800 dark:text-neutral-200">
                     <span className="font-mono text-xs text-neutral-500">{b.orderNumber}</span> · {b.productName}
                   </span>
                   <Badge tone="warning">{b.quantity} awaiting stock</Badge>

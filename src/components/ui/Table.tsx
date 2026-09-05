@@ -12,8 +12,16 @@ export interface TableProps extends TableHTMLAttributes<HTMLTableElement> {
 
 export function Table({ className, wrapperClassName, ...props }: TableProps) {
   return (
-    <div className={cn("w-full overflow-x-auto", wrapperClassName)}>
-      <table className={cn("w-full border-collapse text-sm", className)} {...props} />
+    <div
+      className={cn(
+        "w-full min-w-0 overflow-x-auto overscroll-x-contain",
+        wrapperClassName
+      )}
+    >
+      <table
+        className={cn("w-full border-collapse text-sm", className)}
+        {...props}
+      />
     </div>
   );
 }
@@ -24,7 +32,7 @@ export function THead({ className, ...props }: THeadProps) {
   return (
     <thead
       className={cn(
-        "border-b border-neutral-200 text-left text-xs font-medium uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:text-neutral-400",
+        "sticky top-0 z-10 border-b border-neutral-200 bg-neutral-50 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400",
         className
       )}
       {...props}
@@ -38,7 +46,7 @@ export function TBody({ className, ...props }: TBodyProps) {
   return (
     <tbody
       className={cn(
-        "divide-y divide-neutral-200 dark:divide-neutral-800",
+        "divide-y divide-neutral-200 [&>tr:nth-child(even)]:bg-neutral-50/60 dark:divide-neutral-800 dark:[&>tr:nth-child(even)]:bg-neutral-800/20",
         className
       )}
       {...props}
@@ -63,7 +71,13 @@ export function TR({ className, ...props }: TRProps) {
 export interface THProps extends ThHTMLAttributes<HTMLTableCellElement> {}
 
 export function TH({ className, ...props }: THProps) {
-  return <th className={cn("px-4 py-3 font-medium", className)} scope="col" {...props} />;
+  return (
+    <th
+      className={cn("whitespace-nowrap px-4 py-3.5 font-semibold", className)}
+      scope="col"
+      {...props}
+    />
+  );
 }
 
 export interface TDProps extends TdHTMLAttributes<HTMLTableCellElement> {}
@@ -72,7 +86,7 @@ export function TD({ className, ...props }: TDProps) {
   return (
     <td
       className={cn(
-        "px-4 py-3 text-neutral-800 dark:text-neutral-200",
+        "px-4 py-3.5 text-neutral-800 dark:text-neutral-200",
         className
       )}
       {...props}

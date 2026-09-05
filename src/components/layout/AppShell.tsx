@@ -33,11 +33,22 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
   const pathname = usePathname();
 
   const sidebarContent = (
-    <nav aria-label="Primary" className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-        {brand ?? "DealFlow360"}
+    <nav aria-label="Primary" className="flex h-full min-h-0 flex-col">
+      <div className="flex h-16 shrink-0 items-center gap-2.5 px-5">
+        {typeof brand === "string" || brand == null ? (
+          <>
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-indigo-600 text-[11px] font-bold text-white">
+              DF
+            </div>
+            <span className="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+              {brand ?? "DealFlow360"}
+            </span>
+          </>
+        ) : (
+          brand
+        )}
       </div>
-      <ul className="flex-1 space-y-1 px-3">
+      <ul className="flex-1 space-y-1 overflow-y-auto px-3 py-1">
         {navItems.map((item) => {
           // Longest-prefix match, so /workspace/quotations/abc highlights "Quotations"
           // while the "/workspace" root item does not also light up on every page.
@@ -94,7 +105,7 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
 
   return (
     <div className="flex min-h-screen bg-canvas">
-      <aside className="hidden w-64 shrink-0 border-r border-neutral-200 bg-white md:block dark:border-neutral-800 dark:bg-neutral-900">
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 overflow-hidden border-r border-neutral-200 bg-white md:block dark:border-neutral-800 dark:bg-neutral-900">
         {sidebarContent}
       </aside>
 
@@ -125,11 +136,11 @@ export function AppShell({ navItems, currentUser, children, brand }: AppShellPro
               <Menu className="size-5" aria-hidden="true" />
             )}
           </button>
-          <span className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-            {brand ?? "DealFlow360"}
+          <span className="truncate text-sm font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+            {typeof brand === "string" || brand == null ? (brand ?? "DealFlow360") : "DealFlow360"}
           </span>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8">{children}</main>
       </div>
     </div>
   );

@@ -24,18 +24,18 @@ export function StatTile({
   return (
     <div
       className={cn(
-        "rounded-lg border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900",
+        "min-w-0 rounded-xl border border-[var(--color-hairline)] bg-surface p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900",
         className
       )}
       {...props}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
           {label}
         </p>
-        {icon && <div className="text-neutral-400 dark:text-neutral-500">{icon}</div>}
+        {icon && <div className="shrink-0 text-neutral-400 dark:text-neutral-500">{icon}</div>}
       </div>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+      <p className="mt-2 break-words text-2xl font-semibold tracking-tight tabular-nums text-neutral-900 sm:text-3xl dark:text-neutral-100">
         {value}
       </p>
       {typeof delta === "number" && (

@@ -51,7 +51,7 @@ export function Modal({
         aria-labelledby={title ? titleId : undefined}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
-          "w-full max-w-lg rounded-lg border border-neutral-200 bg-white shadow-xl dark:border-neutral-800 dark:bg-neutral-900",
+          "max-h-[min(90dvh,40rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--color-hairline)] bg-surface shadow-xl dark:border-neutral-800 dark:bg-neutral-900",
           className
         )}
       >
@@ -61,7 +61,7 @@ export function Modal({
               {title && (
                 <h2
                   id={titleId}
-                  className="text-sm font-semibold text-neutral-900 dark:text-neutral-100"
+                  className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-100"
                 >
                   {title}
                 </h2>

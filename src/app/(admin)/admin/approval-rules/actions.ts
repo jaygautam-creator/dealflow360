@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { requireUserApi } from "@/infrastructure/auth/guards";
 import { prisma } from "@/infrastructure/db";
 import { guardConfigWrite } from "../_lib/authGuard";
 
@@ -44,29 +45,69 @@ function toData(parsed: z.infer<typeof ruleSchema>) {
 export async function createApprovalRule(formData: FormData) {
   const guardError = await guardConfigWrite();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.approvalRule.create({ data: toData(parsed.data) });
+  const data = toData(parsed.data);
+  const rule = await prisma.approvalRule.create({ data });
+
+  await prisma.auditEvent.create({
+    data: {
+      entityType: "ApprovalRule",
+      entityId: rule.id,
+      action: "CREATED",
+      actorId: user.id,
+      reason: `Created approval rule "${rule.name}"`,
+      payload: data,
+    },
+  });
+
   revalidatePath("/admin/approval-rules");
 }
 
 export async function updateApprovalRule(id: string, formData: FormData) {
   const guardError = await guardConfigWrite();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
   const parsed = parse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  await prisma.approvalRule.update({ where: { id }, data: toData(parsed.data) });
+  const data = toData(parsed.data);
+  await prisma.approvalRule.update({ where: { id }, data });
+
+  await prisma.auditEvent.create({
+    data: {
+      entityType: "ApprovalRule",
+      entityId: id,
+      action: "UPDATED",
+      actorId: user.id,
+      reason: `Updated approval rule "${data.name}"`,
+      payload: data,
+    },
+  });
+
   revalidatePath("/admin/approval-rules");
 }
 
 export async function deleteApprovalRule(id: string) {
   const guardError = await guardConfigWrite();
   if (guardError) return guardError;
+  const user = await requireUserApi();
 
-  await prisma.approvalRule.delete({ where: { id } });
+  const deleted = await prisma.approvalRule.delete({ where: { id } });
+
+  await prisma.auditEvent.create({
+    data: {
+      entityType: "ApprovalRule",
+      entityId: id,
+      action: "DELETED",
+      actorId: user.id,
+      reason: `Deleted approval rule "${deleted.name}"`,
+    },
+  });
+
   revalidatePath("/admin/approval-rules");
 }

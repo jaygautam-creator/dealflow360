@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { cn } from "@/components/ui/cn";
 import type { InvoiceStatus } from "@/generated/prisma";
+import { RecordPaymentButton } from "./RecordPaymentButton";
 
 export const metadata = { title: "Invoices" };
 export const dynamic = "force-dynamic";
@@ -88,12 +89,14 @@ export default async function InvoicesPage({
                   <TH className="text-right">Paid</TH>
                   <TH>Status</TH>
                   <TH>Due</TH>
+                  <TH className="text-right">Action</TH>
                 </TR>
               </THead>
               <TBody>
                 {invoices.map((invoice) => {
                   const amountPaise = dbToPaise(invoice.amount);
                   const paidPaise = invoice.payments.reduce((sum, p) => sum + dbToPaise(p.amount), 0);
+                  const outstandingPaise = amountPaise - paidPaise;
                   return (
                     <TR key={invoice.id}>
                       <TD className="font-mono text-xs font-medium">{invoice.number}</TD>
@@ -114,6 +117,17 @@ export default async function InvoicesPage({
                               year: "numeric",
                             })
                           : "—"}
+                      </TD>
+                      <TD className="text-right">
+                        {invoice.status !== "PAID" && invoice.status !== "CREDITED" && outstandingPaise > 0 ? (
+                          <RecordPaymentButton
+                            invoiceId={invoice.id}
+                            invoiceNumber={invoice.number}
+                            outstandingRupees={outstandingPaise / 100}
+                          />
+                        ) : (
+                          <span className="text-xs text-neutral-400">Settled</span>
+                        )}
                       </TD>
                     </TR>
                   );

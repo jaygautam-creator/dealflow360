@@ -34,9 +34,9 @@ export default async function PortalHome() {
         <div className="space-y-3">
           {quotations.map((q) => (
             <Link key={q.id} href={`/portal/quotations/${q.id}`} className="block">
-              <Card className="transition hover:border-indigo-300 hover:shadow-sm dark:hover:border-indigo-700">
+              <Card className="transition hover:border-teal-300 hover:shadow-sm dark:hover:border-teal-700">
                 <CardContent className="flex items-center justify-between gap-4 p-4">
-                  <div>
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm text-neutral-900 dark:text-neutral-100">
                         {q.number}
@@ -48,7 +48,7 @@ export default async function PortalHome() {
                       {q.messageCount > 0 ? ` · ${q.messageCount} message${q.messageCount === 1 ? "" : "s"}` : ""}
                     </p>
                   </div>
-                  <span className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+                  <span className="shrink-0 text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                     {money(q.total)}
                   </span>
                 </CardContent>

@@ -37,7 +37,7 @@ export default async function QuotationsPage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500">
                     <th className="px-4 py-3 font-medium">Number</th>
@@ -57,9 +57,11 @@ export default async function QuotationsPage() {
                           {q.number}
                         </Link>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className="text-neutral-900">{q.customer.name}</span>
-                        <span className="ml-2 text-xs text-neutral-400">{q.customer.tier}</span>
+                      <td className="max-w-[220px] px-4 py-3">
+                        <div className="flex min-w-0 items-baseline gap-2">
+                          <span className="truncate text-neutral-900" title={q.customer.name}>{q.customer.name}</span>
+                          <span className="shrink-0 text-xs text-neutral-400">{q.customer.tier}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-neutral-600">{q.owner.name}</td>
                       <td className="px-4 py-3"><Badge tone={statusTone(q.status)}>{label(q.status)}</Badge></td>

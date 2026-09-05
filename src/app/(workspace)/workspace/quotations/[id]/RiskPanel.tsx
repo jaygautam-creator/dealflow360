@@ -24,14 +24,14 @@ export function RiskPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
+      <CardHeader className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <CardTitle>Discount risk</CardTitle>
           <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{explanation}</p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <div
-            className={`text-3xl font-semibold tabular-nums ${
+            className={`text-4xl font-bold tabular-nums leading-none ${
               clean
                 ? "text-emerald-600 dark:text-emerald-400"
                 : assessment.score >= 5
@@ -41,14 +41,14 @@ export function RiskPanel({
           >
             {assessment.score}
           </div>
-          <p className="text-xs text-neutral-500">points over ceiling</p>
+          <p className="mt-1 text-xs font-medium text-neutral-500">points over ceiling</p>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {/* Both signals are always shown, including the one that lost, so an approver can
             see that the other failure mode was checked rather than ignored. */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <SignalTile
             label="Severity"
             hint="Worst single line"
@@ -74,7 +74,7 @@ export function RiskPanel({
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[620px] text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500 dark:border-neutral-800">
                 <th className="pb-2 pr-3 font-medium">Line</th>

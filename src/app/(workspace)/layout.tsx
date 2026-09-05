@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { requireUserPage } from "@/infrastructure/auth/guards";
 import { can, PERMISSIONS as P } from "@/infrastructure/auth/rbac";
 import { redirect } from "next/navigation";
+import { WorkspaceTopBar } from "./WorkspaceTopBar";
 
 /**
  * Internal workspace shell.
@@ -72,6 +73,7 @@ export default async function WorkspaceLayout({ children }: { children: React.Re
       navItems={navItems}
       currentUser={{ name: user.name, role: formatRole(user.role) }}
     >
+      <WorkspaceTopBar showBackend={can(user.role, P.CONFIG_MANAGE) || can(user.role, P.CONFIG_APPROVAL_CHAIN)} />
       {children}
     </AppShell>
   );
