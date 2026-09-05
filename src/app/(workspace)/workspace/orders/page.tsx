@@ -31,6 +31,7 @@ export default async function OrdersPage() {
         fulfillmentPlan: {
           select: {
             shipmentCount: true,
+            isManualOverride: true,
             allocations: {
               select: { lineId: true, productId: true, quantity: true, isBackorder: true, product: { select: { name: true } } },
             },
@@ -98,11 +99,16 @@ export default async function OrdersPage() {
                     <TR key={order.id}>
                       <TD>
                         <Link
-                          href={`/workspace/quotations/${order.quotation.id}`}
+                          href={`/workspace/orders/${order.id}`}
                           className="font-mono text-xs font-medium text-indigo-600 hover:underline"
                         >
                           {order.number}
                         </Link>
+                        {order.fulfillmentPlan?.isManualOverride && (
+                          <Badge tone="info" className="ml-2">
+                            Overridden
+                          </Badge>
+                        )}
                       </TD>
                       <TD>{order.quotation.customer.name}</TD>
                       <TD>
