@@ -244,15 +244,16 @@ export function PortalQuotation({
               <Link
                 key={i.number}
                 href={`/portal/invoices/${i.id}`}
-                className="flex items-center justify-between gap-3 rounded-md text-sm transition hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
+                className="-mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-2 text-sm text-indigo-600 transition hover:bg-neutral-50 hover:underline dark:text-indigo-400 dark:hover:bg-neutral-800/60"
               >
-                <span className="min-w-0 break-all font-mono text-xs text-neutral-500">{i.number}</span>
-                <span className="flex shrink-0 items-center gap-2">
+                <span className="min-w-0 break-all font-mono text-xs">{i.number}</span>
+                <span className="flex shrink-0 items-center gap-2 text-neutral-600 dark:text-neutral-300">
                   <Badge tone={i.type === "RECURRING" ? "info" : "neutral"}>
                     {i.type === "RECURRING" ? "subscription" : "one-time"}
                   </Badge>
                   <span className="tabular-nums">{money(i.amount)}</span>
                   <Badge tone={i.status === "PAID" ? "success" : "warning"}>{i.status.toLowerCase()}</Badge>
+                  <span className="font-medium text-indigo-600 dark:text-indigo-400">View →</span>
                 </span>
               </Link>
             ))}
