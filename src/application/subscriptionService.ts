@@ -33,17 +33,26 @@ export class SubscriptionError extends Error {
   }
 }
 
-/** Steps one interval backwards. The inverse of the domain's `addInterval`. */
+/**
+ * Steps one interval backwards. The inverse of the domain's `addInterval`.
+ *
+ * Works in UTC components throughout, matching every date function in
+ * src/domain/shared/dates.ts. Building this with local getters/setters instead — as an
+ * earlier version did — silently shifted the period boundary whenever the server's
+ * timezone isn't UTC: on this deployment (IST, UTC+5:30), it made a plain calendar month
+ * measure as 31 days instead of 30, so every mid-cycle proration was computed against the
+ * wrong day count.
+ */
 function periodStartFor(nextBillingDate: Date, interval: "MONTHLY" | "QUARTERLY" | "YEARLY"): Date {
   const months = interval === "MONTHLY" ? 1 : interval === "QUARTERLY" ? 3 : 12;
-  const d = new Date(nextBillingDate);
-  const targetMonth = d.getMonth() - months;
-  const candidate = new Date(d.getFullYear(), targetMonth, d.getDate());
+  const d = nextBillingDate;
+  const targetMonth = d.getUTCMonth() - months;
+  const candidate = new Date(Date.UTC(d.getUTCFullYear(), targetMonth, d.getUTCDate()));
   // Stepping back from the 31st into a shorter month must not roll into the next one:
   // 31 March minus one month is 28 February, not 3 March. Same month-end rule the
   // forward direction uses in src/domain/shared/dates.ts.
-  if (candidate.getMonth() !== ((targetMonth % 12) + 12) % 12) {
-    return new Date(d.getFullYear(), targetMonth + 1, 0);
+  if (candidate.getUTCMonth() !== ((targetMonth % 12) + 12) % 12) {
+    return new Date(Date.UTC(d.getUTCFullYear(), targetMonth + 1, 0));
   }
   return candidate;
 }
