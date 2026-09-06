@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/infrastructure/auth/guards";
-import { PERMISSIONS as P } from "@/infrastructure/auth/rbac";
+import { PERMISSIONS as P, can } from "@/infrastructure/auth/rbac";
 import { scopedQuotationWhere } from "@/application/queries";
 import { prisma } from "@/infrastructure/db";
 import { dbToPaise, dbToPct } from "@/infrastructure/money";
@@ -124,7 +124,7 @@ export default async function OrdersPage() {
                         {hasBackorder ? (
                           <div className="space-y-1">
                             <Badge tone="danger">Backorder</Badge>
-                            {consolidation && (
+                            {consolidation && can(user.role, P.FULFILLMENT_OVERRIDE) && (
                               <ConsolidateBackorderButton
                                 orderId={order.id}
                                 warehouseId={consolidation.warehouseId}
