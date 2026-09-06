@@ -3,6 +3,7 @@ import { prisma } from "@/infrastructure/db";
 import { dbToPaise, paiseToDb, dbToPct } from "@/infrastructure/money";
 import { rescoreAfterEdit, writeAudit } from "./quotationService";
 import { netLineTotal } from "@/domain/upsell/recommend";
+import { applyPct } from "@/domain/shared/money";
 import { DomainError } from "@/app/api/_lib/respond";
 import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
 import {
@@ -172,6 +173,36 @@ export async function getPortalInvoice(user: SessionUser, invoiceId: string) {
   const quotation = invoice.salesOrder.quotation;
   const paid = paiseToDb(invoice.payments.reduce((s, p) => s + dbToPaise(p.amount), 0));
 
+  // Invoice type decides which lines belong on this document: a one-time invoice bills
+  // the one-time lines, a recurring invoice bills the subscription line it was raised for.
+  const billedLines = quotation.lines.filter((l) =>
+    invoice.type === "RECURRING" ? l.lineType === "RECURRING" : l.lineType !== "RECURRING",
+  );
+
+  const lines = billedLines.map((l) => {
+    const unit = unitPaise(l);
+    const discountPct = dbToPct(l.discountPct);
+    const taxPct = dbToPct(l.taxPct);
+    const taxableValuePaise = netLineTotal(unit, l.quantity, discountPct);
+    const taxPaise = applyPct(taxableValuePaise, taxPct);
+    return {
+      id: l.id,
+      productName: l.product.name,
+      quantity: l.quantity,
+      unitPrice: paiseToDb(unit),
+      discountPct,
+      taxPct,
+      taxableValue: paiseToDb(taxableValuePaise),
+      taxAmount: paiseToDb(taxPaise),
+      lineTotal: paiseToDb(taxableValuePaise + taxPaise),
+    };
+  });
+
+  const subtotal = lines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
+  const taxableValue = lines.reduce((s, l) => s + l.taxableValue, 0);
+  const taxTotal = lines.reduce((s, l) => s + l.taxAmount, 0);
+  const discountTotal = subtotal - taxableValue;
+
   return {
     id: invoice.id,
     number: invoice.number,
@@ -179,6 +210,11 @@ export async function getPortalInvoice(user: SessionUser, invoiceId: string) {
     status: invoice.status,
     amount: Number(invoice.amount),
     paid,
+    subtotal,
+    discountTotal,
+    taxableValue,
+    taxTotal,
+    invoiceDate: invoice.createdAt.toISOString(),
     dueDate: invoice.dueDate?.toISOString() ?? null,
     periodStart: invoice.periodStart?.toISOString() ?? null,
     periodEnd: invoice.periodEnd?.toISOString() ?? null,
@@ -189,18 +225,7 @@ export async function getPortalInvoice(user: SessionUser, invoiceId: string) {
       city: quotation.customer.city,
       country: quotation.customer.country,
     },
-    // Invoice type decides which lines belong on this document: a one-time invoice bills
-    // the one-time lines, a recurring invoice bills the subscription line it was raised for.
-    lines: quotation.lines
-      .filter((l) => (invoice.type === "RECURRING" ? l.lineType === "RECURRING" : l.lineType !== "RECURRING"))
-      .map((l) => ({
-        id: l.id,
-        productName: l.product.name,
-        quantity: l.quantity,
-        unitPrice: paiseToDb(unitPaise(l)),
-        discountPct: dbToPct(l.discountPct),
-        lineTotal: paiseToDb(netLineTotal(unitPaise(l), l.quantity, dbToPct(l.discountPct))),
-      })),
+    lines,
     payments: invoice.payments.map((p) => ({
       amount: Number(p.amount),
       method: p.method,
