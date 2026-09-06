@@ -44,11 +44,41 @@ model User {
   approvals       ApprovalStep[]
   auditEvents     AuditEvent[]
   negotiations    NegotiationMessage[]
+  resetTokens     PasswordResetToken[]
 
   createdAt DateTime @default(now())
 
   @@index([role])
   @@index([customerId])
+}
+
+// A single-use, expiring password reset grant.
+//
+// The token itself is never stored. What is stored is a SHA-256 digest of it, for the same
+// reason passwords are hashed: a reader of this table must not be able to reset anyone's
+// password. SHA-256 rather than bcrypt here because the secret is 256 bits of CSPRNG
+// output rather than a human-chosen password — there is no dictionary to slow down, and a
+// fast digest keeps verification O(1) against a lookup by digest.
+model PasswordResetToken {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the token that was issued. Unique so a lookup is an index hit, not a scan.
+  tokenHash String @unique
+
+  expiresAt DateTime
+  /// Set the moment the token is spent. Presence of this is what makes it single-use.
+  usedAt    DateTime?
+
+  /// Recorded so a reset can be traced back to where it was requested from.
+  requestedIp String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 enum CustomerTier {

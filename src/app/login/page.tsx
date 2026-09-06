@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/infrastructure/auth/session";
 import { landingPathFor } from "@/infrastructure/auth/landing";
@@ -59,7 +60,11 @@ export default async function LoginPage({
           <div className="mt-8">
             <LoginForm next={next} />
             <p className="mt-5 text-center text-xs text-neutral-400">
-              Forgot your password? Ask your administrator to reset it.
+              Forgot your password?{" "}
+              <Link href="/forgot-password" className="font-medium text-indigo-600 hover:underline">
+                Reset it
+              </Link>
+              .
             </p>
           </div>
         </div>
