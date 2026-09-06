@@ -5,6 +5,7 @@ import { getQuotation, auditTrail, catalogueForCustomer } from "@/application/qu
 import { suggestionsFor } from "@/application/upsellService";
 import { monthEndOfferFor } from "@/application/promotionService";
 import { dbToPaise, paiseToDb, dbToPct } from "@/infrastructure/money";
+import { netLineTotal } from "@/domain/upsell/recommend";
 import { QuotationBuilder } from "./QuotationBuilder";
 import type { RiskAssessment } from "@/domain/risk/types";
 
@@ -56,10 +57,17 @@ export default async function QuotationPage({ params }: { params: Promise<{ id: 
       lineType: l.lineType,
       planName: l.plan?.name ?? null,
       fromUpsell: l.fromUpsell,
-      netTotal:
-        (dbToPaise(l.unitPrice) * l.quantity -
-          Math.round((dbToPaise(l.unitPrice) * l.quantity * dbToPct(l.discountPct)) / 100)) /
-        100,
+      // Includes the variant's extra price, same as every other total computed from this
+      // line (quotationService, invoices, the portal view) — a line pinned to a variant
+      // with a surcharge would otherwise show a total lower than what the customer is
+      // actually billed.
+      netTotal: paiseToDb(
+        netLineTotal(
+          dbToPaise(l.unitPrice) + dbToPaise(l.variant?.extraPrice ?? 0),
+          l.quantity,
+          dbToPct(l.discountPct),
+        ),
+      ),
     })),
     approvalSteps: quotation.approvalSteps.map((s) => ({
       id: s.id,
