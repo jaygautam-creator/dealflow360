@@ -108,8 +108,14 @@ export async function confirmPortalQuotation(
       throw new DomainError(`A quotation in ${quotation.status} state cannot be confirmed from the portal.`);
     }
 
+    // Only the customer's own open ask blocks them — the message is "pending review by
+    // your sales contact", which cannot be true of a message the sales contact sent. A rep
+    // can now reply into this same thread (see quotationService.postRepMessage); without
+    // this filter, a rep's own FYI would leave nothing able to close it (Accept/Decline
+    // are only ever offered on a customer's message) and permanently lock the customer out
+    // of confirming.
     const openMessages = await tx.negotiationMessage.count({
-      where: { quotationId, status: "OPEN" },
+      where: { quotationId, status: "OPEN", author: { role: "PORTAL" } },
     });
     if (openMessages > 0) {
       throw new DomainError("There is an open counter-offer or discussion pending review by your sales contact.");

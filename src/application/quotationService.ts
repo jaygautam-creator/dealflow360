@@ -328,6 +328,14 @@ export async function postRepMessage(user: SessionUser, quotationId: string, bod
       },
     });
 
+    // Touches lastActivityAt for the same reason a customer's message does: a deal a rep
+    // just followed up on is not stalled, and leaving this untouched would have the health
+    // dashboard nag a rep to chase a customer they just messaged.
+    await tx.quotation.update({
+      where: { id: quotationId },
+      data: { lastActivityAt: new Date() },
+    });
+
     await writeAudit(tx, {
       entityType: "Quotation",
       entityId: quotationId,
