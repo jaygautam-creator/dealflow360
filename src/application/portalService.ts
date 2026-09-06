@@ -131,6 +131,7 @@ export async function getPortalQuotation(user: SessionUser, quotationId: string)
       ? {
           number: quotation.salesOrder.number,
           invoices: quotation.salesOrder.invoices.map((i) => ({
+            id: i.id,
             number: i.number,
             type: i.type,
             status: i.status,
@@ -139,6 +140,72 @@ export async function getPortalQuotation(user: SessionUser, quotationId: string)
           })),
         }
       : null,
+  };
+}
+
+/**
+ * A single invoice, formatted for the customer to view or print. Scoped the same way as
+ * every other portal read: through the customer's own quotation, never from the id alone.
+ */
+export async function getPortalInvoice(user: SessionUser, invoiceId: string) {
+  const customerId = assertPortalUser(user);
+
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, salesOrder: { quotation: { customerId } } },
+    include: {
+      payments: { orderBy: { paidAt: "asc" } },
+      salesOrder: {
+        include: {
+          quotation: {
+            include: {
+              customer: true,
+              lines: { include: { product: true, variant: true, plan: true }, orderBy: { sequence: "asc" } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!invoice) return null;
+
+  const quotation = invoice.salesOrder.quotation;
+  const paid = paiseToDb(invoice.payments.reduce((s, p) => s + dbToPaise(p.amount), 0));
+
+  return {
+    id: invoice.id,
+    number: invoice.number,
+    type: invoice.type,
+    status: invoice.status,
+    amount: Number(invoice.amount),
+    paid,
+    dueDate: invoice.dueDate?.toISOString() ?? null,
+    periodStart: invoice.periodStart?.toISOString() ?? null,
+    periodEnd: invoice.periodEnd?.toISOString() ?? null,
+    orderNumber: invoice.salesOrder.number,
+    quotationNumber: quotation.number,
+    customer: {
+      name: quotation.customer.name,
+      city: quotation.customer.city,
+      country: quotation.customer.country,
+    },
+    // Invoice type decides which lines belong on this document: a one-time invoice bills
+    // the one-time lines, a recurring invoice bills the subscription line it was raised for.
+    lines: quotation.lines
+      .filter((l) => (invoice.type === "RECURRING" ? l.lineType === "RECURRING" : l.lineType !== "RECURRING"))
+      .map((l) => ({
+        id: l.id,
+        productName: l.product.name,
+        quantity: l.quantity,
+        unitPrice: paiseToDb(unitPaise(l)),
+        discountPct: dbToPct(l.discountPct),
+        lineTotal: paiseToDb(netLineTotal(unitPaise(l), l.quantity, dbToPct(l.discountPct))),
+      })),
+    payments: invoice.payments.map((p) => ({
+      amount: Number(p.amount),
+      method: p.method,
+      paidAt: p.paidAt.toISOString(),
+    })),
   };
 }
 

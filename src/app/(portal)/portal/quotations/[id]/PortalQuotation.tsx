@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MessageSquare, Send, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -25,7 +26,7 @@ export function PortalQuotation({
     id: string; number: string; status: string; subtotal: number; discountTotal: number;
     taxTotal: number; total: number; repName: string; repEmail: string;
     lines: PortalLine[]; messages: PortalMessage[];
-    order: { number: string; invoices: { number: string; type: string; status: string; amount: number; paid: number }[] } | null;
+    order: { number: string; invoices: { id: string; number: string; type: string; status: string; amount: number; paid: number }[] } | null;
   };
 }) {
   const router = useRouter();
@@ -240,7 +241,11 @@ export function PortalQuotation({
           <CardHeader><CardTitle>Order {quotation.order.number}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             {quotation.order.invoices.map((i) => (
-              <div key={i.number} className="flex items-center justify-between gap-3 text-sm">
+              <Link
+                key={i.number}
+                href={`/portal/invoices/${i.id}`}
+                className="flex items-center justify-between gap-3 rounded-md text-sm transition hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
+              >
                 <span className="min-w-0 break-all font-mono text-xs text-neutral-500">{i.number}</span>
                 <span className="flex shrink-0 items-center gap-2">
                   <Badge tone={i.type === "RECURRING" ? "info" : "neutral"}>
@@ -249,7 +254,7 @@ export function PortalQuotation({
                   <span className="tabular-nums">{money(i.amount)}</span>
                   <Badge tone={i.status === "PAID" ? "success" : "warning"}>{i.status.toLowerCase()}</Badge>
                 </span>
-              </div>
+              </Link>
             ))}
           </CardContent>
         </Card>
