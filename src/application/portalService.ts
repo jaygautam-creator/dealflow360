@@ -43,7 +43,7 @@ function assertPortalUser(user: SessionUser): string {
  * from the unit price. Crossing to paise once, here, is what keeps the arithmetic below
  * out of floating point.
  */
-function unitPaise(line: {
+export function unitPaise(line: {
   unitPrice: unknown;
   variant: { extraPrice: unknown } | null;
 }): number {

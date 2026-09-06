@@ -99,7 +99,11 @@ export default async function InvoicesPage({
                   const outstandingPaise = amountPaise - paidPaise;
                   return (
                     <TR key={invoice.id}>
-                      <TD className="font-mono text-xs font-medium">{invoice.number}</TD>
+                      <TD className="font-mono text-xs font-medium">
+                        <Link href={`/workspace/orders/invoices/${invoice.id}`} className="text-indigo-600 hover:underline">
+                          {invoice.number}
+                        </Link>
+                      </TD>
                       <TD className="font-mono text-xs text-neutral-500">{invoice.salesOrder.number}</TD>
                       <TD>{invoice.type === "RECURRING" ? "Recurring" : "One-time"}</TD>
                       <TD className="text-right tabular-nums">{money(amountPaise)}</TD>
