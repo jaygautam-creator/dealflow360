@@ -81,8 +81,7 @@ export function PipelineChart({
                 {d.count}
               </text>
               <title>
-                {d.status.replaceAll("_", " ").toLowerCase()}: {d.count} quotation
-                {d.count === 1 ? "" : "s"}
+                {`${d.status.replaceAll("_", " ").toLowerCase()}: ${d.count} quotation${d.count === 1 ? "" : "s"}`}
               </title>
             </g>
           );
