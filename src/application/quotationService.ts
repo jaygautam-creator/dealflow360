@@ -8,6 +8,8 @@ import { applyPct, sumPaise } from "@/domain/shared/money";
 import type { RiskAssessment, RiskLineInput } from "@/domain/risk/types";
 import type { Prisma, Role } from "@/generated/prisma";
 import { assertCanMutateQuotation } from "@/infrastructure/auth/guards";
+import { DomainError } from "@/app/api/_lib/respond";
+import type { SessionUser } from "@/infrastructure/auth/session";
 
 /**
  * Quotation service.
@@ -292,5 +294,46 @@ export async function writeAudit(tx: Tx, input: AuditInput): Promise<void> {
       reason: input.reason ?? null,
       payload: (input.payload ?? null) as Prisma.InputJsonValue,
     },
+  });
+}
+
+/**
+ * A plain reply from the owning rep into the same negotiation thread the customer writes
+ * into — a rep could only Accept or Decline a counter-offer before this, with no way to
+ * just answer a question or reset expectations without disguising it as a decision.
+ *
+ * Never sets a requestedDiscountPct: a rep proposing their own discount belongs in the
+ * quotation builder (it must clear the same risk/approval path every other discount
+ * does), not in a chat message that could apply itself unreviewed.
+ */
+export async function postRepMessage(user: SessionUser, quotationId: string, body: string): Promise<void> {
+  const quotation = await prisma.quotation.findUnique({
+    where: { id: quotationId },
+    select: { id: true, ownerId: true, status: true },
+  });
+  if (!quotation) throw new DomainError("Quotation not found.");
+  assertCanMutateQuotation(user, quotation);
+
+  if (quotation.status !== "SENT" && quotation.status !== "UNDER_NEGOTIATION") {
+    throw new DomainError("A message can only be sent once the quotation has been sent to the customer.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.negotiationMessage.create({
+      data: {
+        quotationId,
+        authorId: user.id,
+        body,
+        status: "OPEN",
+      },
+    });
+
+    await writeAudit(tx, {
+      entityType: "Quotation",
+      entityId: quotationId,
+      action: "REP_MESSAGE",
+      actorId: user.id,
+      reason: "Message sent to customer",
+    });
   });
 }

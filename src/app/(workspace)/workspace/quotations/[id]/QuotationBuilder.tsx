@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RiskPanel } from "./RiskPanel";
 import type { RiskAssessment } from "@/domain/risk/types";
@@ -90,6 +91,9 @@ export function QuotationBuilder({
 
   const locked = quotation.salesOrder !== null;
   const editable = permissions.mayEdit && !locked && ["DRAFT", "APPROVED", "SENT", "UNDER_NEGOTIATION"].includes(quotation.status);
+  // A rep can reply once the customer can actually see the thread — before the quotation
+  // is sent, there is no portal audience for the message yet.
+  const canReply = permissions.mayEdit && !locked && ["SENT", "UNDER_NEGOTIATION"].includes(quotation.status);
   const pendingStep = quotation.approvalSteps.find((s) => s.status === "PENDING");
   const mayActOnStep =
     pendingStep !== undefined &&
@@ -364,16 +368,24 @@ export function QuotationBuilder({
             </CardContent>
           </Card>
 
-          {negotiations.length > 0 ? (
+          {negotiations.length > 0 || canReply ? (
             <NegotiationPanel
               negotiations={negotiations}
               canRespond={permissions.mayEdit}
+              canReply={canReply}
               working={working}
               onRespond={(id, action, reason) =>
                 void call(
                   `/api/negotiations/${id}`,
                   { method: "POST", body: JSON.stringify(action === "ACCEPT" ? { action } : { action, reason }) },
                   action === "ACCEPT" ? "Counter-offer accepted." : "Counter-offer declined.",
+                )
+              }
+              onReply={(body) =>
+                void call(
+                  `/api/quotations/${quotation.id}/messages`,
+                  { method: "POST", body: JSON.stringify({ body }) },
+                  "Message sent to customer.",
                 )
               }
             />
@@ -557,20 +569,46 @@ function OrderPanel({ order }: { order: NonNullable<Parameters<typeof QuotationB
 }
 
 function NegotiationPanel({
-  negotiations, canRespond, working, onRespond,
+  negotiations, canRespond, canReply, working, onRespond, onReply,
 }: {
   negotiations: Negotiation[];
   canRespond: boolean;
+  canReply: boolean;
   working: boolean;
   onRespond: (id: string, action: "ACCEPT" | "DECLINE", reason?: string) => void;
+  onReply: (body: string) => void;
 }) {
   // Newest first, so the counter-offer the rep actually has to act on is the first
   // thing they see rather than buried under the history of the conversation.
   const ordered = [...negotiations].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const [draft, setDraft] = useState("");
+
+  function submitReply() {
+    const body = draft.trim();
+    if (!body) return;
+    onReply(body);
+    setDraft("");
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle className="flex items-center gap-2"><MessageSquare className="size-4" />Negotiation</CardTitle></CardHeader>
       <CardContent className="space-y-3">
+        {canReply ? (
+          <div className="flex items-start gap-2">
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Reply to the customer…"
+              rows={2}
+              disabled={working}
+              className="flex-1"
+            />
+            <Button size="sm" loading={working} disabled={!draft.trim()} onClick={submitReply}>
+              <Send className="size-4" />Send
+            </Button>
+          </div>
+        ) : null}
         {ordered.map((n) => {
           const isCustomer = n.authorRole === "PORTAL";
           const open = n.status === "OPEN";
