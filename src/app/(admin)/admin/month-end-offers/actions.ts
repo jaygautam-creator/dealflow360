@@ -32,7 +32,7 @@ function parse(formData: FormData) {
     windowDays: formData.get("windowDays"),
     bonusDiscountPct: formData.get("bonusDiscountPct"),
     maxGiftShareOfOrderPct: formData.get("maxGiftShareOfOrderPct"),
-    isActive: formData.get("isActive") === "true",
+    isActive: formData.has("isActive"),
   });
 }
 
