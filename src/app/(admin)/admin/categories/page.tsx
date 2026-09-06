@@ -19,6 +19,7 @@ export default async function CategoriesPage() {
   return (
     <EntityManager
       title="Categories"
+      entityName="Category"
       subtitle="Category-level discount ceilings. Thin-margin categories sit below a customer's tier ceiling — the stricter one wins on every quotation."
       emptyLabel="No categories yet"
       rows={rows}

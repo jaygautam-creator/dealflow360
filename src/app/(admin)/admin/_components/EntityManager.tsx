@@ -53,6 +53,10 @@ export interface DetailLink {
 
 export interface EntityManagerProps<Row extends Record<string, unknown> & { id: string }> {
   title: string;
+  /** Singular form of `title`, for modal headings and action labels ("Edit Category").
+      Only needed when dropping the trailing "s" doesn't produce it, e.g. a title
+      ending in "-ies" ("Categories" -> "Categorie" is wrong; pass "Category"). */
+  entityName?: string;
   subtitle?: string;
   columns: ColumnDef[];
   rows: Row[];
@@ -143,6 +147,7 @@ function FieldInput({
 
 export function EntityManager<Row extends Record<string, unknown> & { id: string }>({
   title,
+  entityName,
   subtitle,
   columns,
   rows,
@@ -157,6 +162,7 @@ export function EntityManager<Row extends Record<string, unknown> & { id: string
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const singular = entityName ?? title.slice(0, -1);
   const editing = modalRow !== null && modalRow !== "new" ? modalRow : null;
   // Defaults are read straight off the row by field name — rows are shaped by the page to
   // match field names 1:1, so no per-entity mapping function is needed (see ColumnDef note).
@@ -237,7 +243,7 @@ export function EntityManager<Row extends Record<string, unknown> & { id: string
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label={`Edit ${title.slice(0, -1)}`}
+                        aria-label={`Edit ${singular}`}
                         onClick={() => setModalRow(row)}
                       >
                         <Pencil className="size-4" />
@@ -245,7 +251,7 @@ export function EntityManager<Row extends Record<string, unknown> & { id: string
                       <Button
                         variant="ghost"
                         size="sm"
-                        aria-label={`Delete ${title.slice(0, -1)}`}
+                        aria-label={`Delete ${singular}`}
                         disabled={pending}
                         onClick={() => handleDelete(row)}
                       >
@@ -263,7 +269,7 @@ export function EntityManager<Row extends Record<string, unknown> & { id: string
       <Modal
         open={modalRow !== null}
         onClose={closeModal}
-        title={editing ? `Edit ${title.slice(0, -1)}` : `New ${title.slice(0, -1)}`}
+        title={editing ? `Edit ${singular}` : `New ${singular}`}
       >
         <form action={handleSubmit} className="flex flex-col gap-4">
           {fields.map((field) => (
